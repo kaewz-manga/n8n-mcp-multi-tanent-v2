@@ -6,7 +6,3 @@ compatibility_date = "2025-01-26"
 # Observability
 [observability]
 enabled = true
-
-# Limits
-[limits]
-cpu_ms = 300000  # 5 minutes max for long-running workflows

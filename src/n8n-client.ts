@@ -38,49 +38,47 @@ export class N8nClient {
     return response.json();
   }
 
-  // Workflow Methods
+  // Workflow Methods (Public API: /api/v1/)
   async listWorkflows() {
-    return this.request('/rest/workflows', { method: 'GET' });
+    return this.request('/api/v1/workflows', { method: 'GET' });
   }
 
   async getWorkflow(id: string) {
-    return this.request(`/rest/workflows/${id}`, { method: 'GET' });
+    return this.request(`/api/v1/workflows/${id}`, { method: 'GET' });
   }
 
   async createWorkflow(workflow: any) {
-    return this.request('/rest/workflows', {
+    return this.request('/api/v1/workflows', {
       method: 'POST',
       body: JSON.stringify(workflow),
     });
   }
 
   async updateWorkflow(id: string, workflow: any) {
-    return this.request(`/rest/workflows/${id}`, {
+    return this.request(`/api/v1/workflows/${id}`, {
       method: 'PUT',
       body: JSON.stringify(workflow),
     });
   }
 
   async deleteWorkflow(id: string) {
-    return this.request(`/rest/workflows/${id}`, { method: 'DELETE' });
+    return this.request(`/api/v1/workflows/${id}`, { method: 'DELETE' });
   }
 
   async activateWorkflow(id: string) {
-    return this.request(`/rest/workflows/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ active: true }),
+    return this.request(`/api/v1/workflows/${id}/activate`, {
+      method: 'POST',
     });
   }
 
   async deactivateWorkflow(id: string) {
-    return this.request(`/rest/workflows/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ active: false }),
+    return this.request(`/api/v1/workflows/${id}/deactivate`, {
+      method: 'POST',
     });
   }
 
   async executeWorkflow(id: string, data?: any) {
-    return this.request(`/api/v1/workflows/${id}/execute`, {
+    return this.request(`/api/v1/workflows/${id}/run`, {
       method: 'POST',
       body: JSON.stringify(data || {}),
     });
@@ -93,22 +91,22 @@ export class N8nClient {
   async updateWorkflowTags(id: string, tags: string[]) {
     return this.request(`/api/v1/workflows/${id}/tags`, {
       method: 'PUT',
-      body: JSON.stringify({ tags }),
+      body: JSON.stringify(tags.map(t => ({ name: t }))),
     });
   }
 
-  // Execution Methods
+  // Execution Methods (Public API: /api/v1/)
   async listExecutions(workflowId?: string) {
     const query = workflowId ? `?workflowId=${workflowId}` : '';
-    return this.request(`/rest/executions${query}`, { method: 'GET' });
+    return this.request(`/api/v1/executions${query}`, { method: 'GET' });
   }
 
   async getExecution(id: string) {
-    return this.request(`/rest/executions/${id}`, { method: 'GET' });
+    return this.request(`/api/v1/executions/${id}`, { method: 'GET' });
   }
 
   async deleteExecution(id: string) {
-    return this.request(`/rest/executions/${id}`, { method: 'DELETE' });
+    return this.request(`/api/v1/executions/${id}`, { method: 'DELETE' });
   }
 
   async retryExecution(id: string) {
@@ -117,27 +115,27 @@ export class N8nClient {
     });
   }
 
-  // Credential Methods
+  // Credential Methods (Public API: /api/v1/)
   async listCredentials() {
-    return this.request('/rest/credentials', { method: 'GET' });
+    return this.request('/api/v1/credentials', { method: 'GET' });
   }
 
   async createCredential(credential: any) {
-    return this.request('/rest/credentials', {
+    return this.request('/api/v1/credentials', {
       method: 'POST',
       body: JSON.stringify(credential),
     });
   }
 
   async updateCredential(id: string, credential: any) {
-    return this.request(`/rest/credentials/${id}`, {
-      method: 'PUT',
+    return this.request(`/api/v1/credentials/${id}`, {
+      method: 'PATCH',
       body: JSON.stringify(credential),
     });
   }
 
   async deleteCredential(id: string) {
-    return this.request(`/rest/credentials/${id}`, { method: 'DELETE' });
+    return this.request(`/api/v1/credentials/${id}`, { method: 'DELETE' });
   }
 
   async getCredentialSchema(credentialType: string) {

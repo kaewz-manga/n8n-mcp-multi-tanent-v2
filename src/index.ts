@@ -3,12 +3,7 @@
  * Multi-tenant n8n automation via Model Context Protocol
  */
 
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
+// Note: MCP SDK not used for HTTP transport - we implement JSON-RPC directly
 
 import { N8nClient } from './n8n-client';
 import { MCPToolResponse } from './types';
@@ -173,72 +168,152 @@ async function handleToolCall(
 }
 
 /**
+ * CORS headers for all responses
+ */
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, X-N8N-URL, X-N8N-API-KEY',
+};
+
+/**
+ * Create JSON-RPC 2.0 response
+ */
+function jsonRpcResponse(id: string | number | null, result: any): Response {
+  return new Response(
+    JSON.stringify({
+      jsonrpc: '2.0',
+      id,
+      result,
+    }),
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        ...CORS_HEADERS,
+      },
+    }
+  );
+}
+
+/**
+ * Create JSON-RPC 2.0 error response
+ */
+function jsonRpcError(id: string | number | null, code: number, message: string): Response {
+  return new Response(
+    JSON.stringify({
+      jsonrpc: '2.0',
+      id,
+      error: {
+        code,
+        message,
+      },
+    }),
+    {
+      status: code === -32600 ? 400 : 500,
+      headers: {
+        'Content-Type': 'application/json',
+        ...CORS_HEADERS,
+      },
+    }
+  );
+}
+
+/**
  * Cloudflare Workers Fetch Handler
  */
 export default {
   async fetch(request: Request, env: any, ctx: any): Promise<Response> {
     // Handle CORS preflight
     if (request.method === 'OPTIONS') {
-      return new Response(null, {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, X-N8N-URL, X-N8N-API-KEY',
-        },
-      });
+      return new Response(null, { headers: CORS_HEADERS });
+    }
+
+    // Handle GET request (health check / info)
+    if (request.method === 'GET') {
+      return new Response(
+        JSON.stringify({
+          name: 'n8n-mcp-workers',
+          version: '1.0.0',
+          description: 'Multi-tenant n8n MCP server',
+          status: 'ok',
+        }),
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            ...CORS_HEADERS,
+          },
+        }
+      );
+    }
+
+    let body: any;
+    try {
+      body = await request.json();
+    } catch {
+      return jsonRpcError(null, -32700, 'Parse error: Invalid JSON');
+    }
+
+    const { jsonrpc, id, method, params } = body;
+
+    // Validate JSON-RPC format
+    if (jsonrpc !== '2.0') {
+      return jsonRpcError(id, -32600, 'Invalid Request: jsonrpc must be "2.0"');
     }
 
     try {
-      // Extract n8n config from headers
-      const config = getN8nConfigFromHeaders(request);
-      const client = new N8nClient(config);
-
-      // Parse MCP request
-      const body = await request.json();
-
-      // Handle list tools request
-      if (body.method === 'tools/list') {
-        return new Response(
-          JSON.stringify({
-            tools: TOOLS,
-          }),
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': '*',
+      // Handle MCP methods
+      switch (method) {
+        // ========== Initialize ==========
+        case 'initialize': {
+          return jsonRpcResponse(id, {
+            protocolVersion: '2024-11-05',
+            capabilities: {
+              tools: {},
             },
-          }
-        );
-      }
-
-      // Handle tool call request
-      if (body.method === 'tools/call') {
-        const { name, arguments: args } = body.params;
-        const result = await handleToolCall(name, args, client);
-
-        return new Response(JSON.stringify(result), {
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-          },
-        });
-      }
-
-      return new Response(
-        JSON.stringify({ error: 'Unknown MCP method' }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' },
+            serverInfo: {
+              name: 'n8n-mcp-workers',
+              version: '1.0.0',
+            },
+          });
         }
-      );
+
+        // ========== Initialized notification ==========
+        case 'notifications/initialized': {
+          // Client notification, no response needed but we send acknowledgment
+          return jsonRpcResponse(id, {});
+        }
+
+        // ========== List Tools ==========
+        case 'tools/list': {
+          return jsonRpcResponse(id, {
+            tools: TOOLS,
+          });
+        }
+
+        // ========== Call Tool ==========
+        case 'tools/call': {
+          // Extract n8n config from headers (only needed for tool calls)
+          const config = getN8nConfigFromHeaders(request);
+          const client = new N8nClient(config);
+
+          const { name, arguments: args } = params;
+          const result = await handleToolCall(name, args || {}, client);
+
+          return jsonRpcResponse(id, result);
+        }
+
+        // ========== Ping ==========
+        case 'ping': {
+          return jsonRpcResponse(id, {});
+        }
+
+        // ========== Unknown method ==========
+        default: {
+          return jsonRpcError(id, -32601, `Method not found: ${method}`);
+        }
+      }
     } catch (error: any) {
-      return new Response(
-        JSON.stringify({ error: error.message }),
-        {
-          status: 500,
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
+      return jsonRpcError(id, -32603, `Internal error: ${error.message}`);
     }
   },
 };

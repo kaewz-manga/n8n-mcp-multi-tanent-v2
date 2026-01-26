@@ -91,12 +91,12 @@ npm start <N8N_URL> <N8N_API_KEY>
 
 **Example:**
 ```bash
-npm start https://n8n-no1.missmanga.org n8nApiKey_xxxx
+npm start https://your-n8n.com n8nApiKey_xxxx
 ```
 
 Or use environment variables:
 ```bash
-N8N_URL=https://n8n-no1.missmanga.org N8N_API_KEY=n8nApiKey_xxxx npm start
+N8N_URL=https://your-n8n.com N8N_API_KEY=n8nApiKey_xxxx npm start
 ```
 
 ### 3. Configure Claude Desktop
@@ -110,7 +110,7 @@ Edit `%APPDATA%\Claude\claude_desktop_config.json` (Windows) or `~/Library/Appli
       "command": "node",
       "args": [
         "D:/path/to/n8n-mcp-workers/stdio-server.js",
-        "https://n8n-no1.missmanga.org",
+        "https://your-n8n.com",
         "n8nApiKey_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
       ]
     },
@@ -118,7 +118,7 @@ Edit `%APPDATA%\Claude\claude_desktop_config.json` (Windows) or `~/Library/Appli
       "command": "node",
       "args": [
         "D:/path/to/n8n-mcp-workers/stdio-server.js",
-        "https://n8n-no2.missmanga.org",
+        "https://your-n8n-secondary.com",
         "n8nApiKey_yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
       ]
     }

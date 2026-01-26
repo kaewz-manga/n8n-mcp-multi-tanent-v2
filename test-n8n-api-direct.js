@@ -3,7 +3,7 @@
  * Tests n8n API connection without MCP layer
  */
 
-const N8N_URL = process.argv[2] || 'https://n8n-no1.missmanga.org';
+const N8N_URL = process.argv[2] || 'https://your-n8n.com';
 const N8N_API_KEY = process.argv[3] || '';
 
 if (!N8N_API_KEY) {

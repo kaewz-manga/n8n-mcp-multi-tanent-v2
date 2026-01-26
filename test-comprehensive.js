@@ -6,7 +6,7 @@
 const SERVER_URL = 'http://localhost:3000';
 
 // Get credentials from command line args or env vars
-const N8N_URL = process.argv[2] || process.env.N8N_URL || 'https://n8n-no1.missmanga.org';
+const N8N_URL = process.argv[2] || process.env.N8N_URL || 'https://your-n8n.com';
 const N8N_API_KEY = process.argv[3] || process.env.N8N_API_KEY || '';
 
 if (!N8N_API_KEY) {

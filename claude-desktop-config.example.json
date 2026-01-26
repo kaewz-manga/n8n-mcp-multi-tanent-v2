@@ -4,7 +4,7 @@
       "command": "node",
       "args": [
         "D:/path/to/n8n-mcp-workers/stdio-server.js",
-        "https://n8n-no1.missmanga.org",
+        "https://your-n8n.com",
         "n8nApiKey_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
       ]
     },
@@ -12,7 +12,7 @@
       "command": "node",
       "args": [
         "D:/path/to/n8n-mcp-workers/stdio-server.js",
-        "https://n8n-no2.missmanga.org",
+        "https://your-n8n-secondary.com",
         "n8nApiKey_yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
       ]
     }

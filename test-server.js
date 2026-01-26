@@ -309,13 +309,13 @@ URL: http://localhost:${PORT}
 Test commands:
   curl -X POST http://localhost:${PORT} \\
     -H "Content-Type: application/json" \\
-    -H "X-N8N-URL: https://n8n-no1.missmanga.org" \\
+    -H "X-N8N-URL: https://your-n8n.com" \\
     -H "X-N8N-API-KEY: test-key" \\
     -d '{"method":"tools/list"}'
 
   curl -X POST http://localhost:${PORT} \\
     -H "Content-Type: application/json" \\
-    -H "X-N8N-URL: https://n8n-no1.missmanga.org" \\
+    -H "X-N8N-URL: https://your-n8n.com" \\
     -H "X-N8N-API-KEY: test-key" \\
     -d '{"method":"tools/call","params":{"name":"n8n_list_workflows","arguments":{}}}'
 `);

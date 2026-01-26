@@ -56,7 +56,7 @@ async function testRealN8n() {
 
   // Get credentials
   console.log('กรุณาใส่ข้อมูล n8n instance ของคุณ:\n');
-  const n8nUrl = await question('n8n URL (e.g., https://n8n-no1.missmanga.org): ');
+  const n8nUrl = await question('n8n URL (e.g., https://your-n8n.com): ');
   const apiKey = await question('n8n API Key: ');
 
   if (!n8nUrl || !apiKey) {

@@ -17,7 +17,18 @@ A lightweight, serverless MCP server that provides complete access to n8n REST A
 
 ---
 
-## Quick Start
+## Usage Modes
+
+This server supports **two modes**:
+
+| Mode | Use Case | Transport | Configuration |
+|------|----------|-----------|---------------|
+| **Cloudflare Workers** | Multi-tenant, public access | HTTP | Headers (X-N8N-URL, X-N8N-API-KEY) |
+| **Claude Desktop** | Local, single/multi n8n instances | stdio | Command-line args or env vars |
+
+---
+
+## Quick Start (Cloudflare Workers)
 
 ### 1. Install Dependencies
 
@@ -61,6 +72,72 @@ Ask your MCP client:
 ```
 List all my n8n workflows
 ```
+
+---
+
+## Quick Start (Claude Desktop)
+
+### 1. Install Dependencies
+
+```bash
+npm install
+```
+
+### 2. Run MCP Server Locally
+
+```bash
+npm start <N8N_URL> <N8N_API_KEY>
+```
+
+**Example:**
+```bash
+npm start https://n8n-no1.missmanga.org n8nApiKey_xxxx
+```
+
+Or use environment variables:
+```bash
+N8N_URL=https://n8n-no1.missmanga.org N8N_API_KEY=n8nApiKey_xxxx npm start
+```
+
+### 3. Configure Claude Desktop
+
+Edit `%APPDATA%\Claude\claude_desktop_config.json` (Windows) or `~/Library/Application Support/Claude/claude_desktop_config.json` (Mac):
+
+```json
+{
+  "mcpServers": {
+    "n8n-no1": {
+      "command": "node",
+      "args": [
+        "D:/path/to/n8n-mcp-workers/stdio-server.js",
+        "https://n8n-no1.missmanga.org",
+        "n8nApiKey_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      ]
+    },
+    "n8n-no2": {
+      "command": "node",
+      "args": [
+        "D:/path/to/n8n-mcp-workers/stdio-server.js",
+        "https://n8n-no2.missmanga.org",
+        "n8nApiKey_yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+      ]
+    }
+  }
+}
+```
+
+**Important:**
+- Replace `/path/to/n8n-mcp-workers/` with your actual project path
+- Use forward slashes (`/`) even on Windows
+- Each n8n instance gets its own MCP server entry
+- Restart Claude Desktop after config changes
+
+### 4. Verify Connection
+
+1. Restart Claude Desktop
+2. Open new chat
+3. Check MCP icon (🔌) - should see "n8n-no1", "n8n-no2"
+4. Ask: "List all my n8n workflows"
 
 ---
 

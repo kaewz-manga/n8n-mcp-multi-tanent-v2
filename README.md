@@ -141,6 +141,44 @@ Edit `%APPDATA%\Claude\claude_desktop_config.json` (Windows) or `~/Library/Appli
 
 ---
 
+## CI/CD Deployment (GitHub Actions)
+
+### Setup Automatic Deployment
+
+**1. Get Cloudflare Credentials**
+
+Get your API Token and Account ID:
+- Login to [Cloudflare Dashboard](https://dash.cloudflare.com/)
+- Go to **My Profile** → **API Tokens**
+- Create Token → **Edit Cloudflare Workers** template
+- Copy the API Token
+- Go to **Workers & Pages** → Copy your Account ID
+
+**2. Add GitHub Secrets**
+
+In your GitHub repository:
+- Go to **Settings** → **Secrets and variables** → **Actions**
+- Click **New repository secret**
+- Add these secrets:
+  - `CLOUDFLARE_API_TOKEN` - Your Cloudflare API Token
+  - `CLOUDFLARE_ACCOUNT_ID` - Your Account ID
+
+**3. Push to Main Branch**
+
+```bash
+git push origin main
+```
+
+The workflow will automatically:
+- ✅ Install dependencies
+- ✅ Run type checks
+- ✅ Deploy to Cloudflare Workers
+- ✅ Show deployment URL in Actions log
+
+**Deployment URL**: Check GitHub Actions → Deploy workflow → Deploy step
+
+---
+
 ## How It Works
 
 ### Architecture

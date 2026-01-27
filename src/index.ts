@@ -15,6 +15,12 @@ import {
   verifyAuthToken,
 } from './auth';
 import {
+  getOAuthAuthorizeUrl,
+  handleOAuthCallback,
+  generateOAuthState,
+  validateOAuthState,
+} from './oauth';
+import {
   getUserById,
   getConnectionsByUserId,
   getApiKeysByUserId,
@@ -274,6 +280,116 @@ async function handleManagementApi(
     const body = await request.json() as { email: string; password: string };
     const result = await handleLogin(env.DB, env.JWT_SECRET, body.email, body.password);
     return apiResponse(result, result.success ? 200 : 401);
+  }
+
+  // OAuth: Get available providers
+  if (path === '/api/auth/oauth/providers' && method === 'GET') {
+    return apiResponse({
+      success: true,
+      data: {
+        providers: [
+          { id: 'github', name: 'GitHub', enabled: !!env.GITHUB_CLIENT_ID },
+          { id: 'google', name: 'Google', enabled: !!env.GOOGLE_CLIENT_ID },
+        ].filter(p => p.enabled),
+      },
+    });
+  }
+
+  // OAuth: Initiate flow (redirect URL)
+  const oauthInitMatch = path.match(/^\/api\/auth\/oauth\/(github|google)$/);
+  if (oauthInitMatch && method === 'GET') {
+    const provider = oauthInitMatch[1] as 'github' | 'google';
+    const url = new URL(request.url);
+    const redirectUri = url.searchParams.get('redirect_uri') || `${env.APP_URL || url.origin}/api/auth/oauth/${provider}/callback`;
+
+    // Check if provider is configured
+    if (provider === 'github' && !env.GITHUB_CLIENT_ID) {
+      return apiResponse({
+        success: false,
+        error: { code: 'PROVIDER_NOT_CONFIGURED', message: 'GitHub OAuth is not configured' },
+      }, 400);
+    }
+    if (provider === 'google' && !env.GOOGLE_CLIENT_ID) {
+      return apiResponse({
+        success: false,
+        error: { code: 'PROVIDER_NOT_CONFIGURED', message: 'Google OAuth is not configured' },
+      }, 400);
+    }
+
+    // Generate state for CSRF protection
+    const state = await generateOAuthState(env.RATE_LIMIT_KV);
+
+    // Store redirect URI for callback
+    await env.RATE_LIMIT_KV.put(`oauth_redirect:${state}`, redirectUri, { expirationTtl: 600 });
+
+    const authorizeUrl = getOAuthAuthorizeUrl(provider, env, redirectUri, state);
+
+    return apiResponse({
+      success: true,
+      data: {
+        url: authorizeUrl,
+        state,
+      },
+    });
+  }
+
+  // OAuth: Callback handler
+  const oauthCallbackMatch = path.match(/^\/api\/auth\/oauth\/(github|google)\/callback$/);
+  if (oauthCallbackMatch && method === 'GET') {
+    const provider = oauthCallbackMatch[1] as 'github' | 'google';
+    const url = new URL(request.url);
+    const code = url.searchParams.get('code');
+    const state = url.searchParams.get('state');
+    const error = url.searchParams.get('error');
+
+    // Handle OAuth error
+    if (error) {
+      const errorDesc = url.searchParams.get('error_description') || error;
+      // Redirect to frontend with error
+      const frontendUrl = env.APP_URL || url.origin;
+      return Response.redirect(`${frontendUrl}/login?error=${encodeURIComponent(errorDesc)}`, 302);
+    }
+
+    // Validate code and state
+    if (!code || !state) {
+      return apiResponse({
+        success: false,
+        error: { code: 'INVALID_REQUEST', message: 'Missing code or state parameter' },
+      }, 400);
+    }
+
+    // Validate state (CSRF protection)
+    const validState = await validateOAuthState(env.RATE_LIMIT_KV, state);
+    if (!validState) {
+      return apiResponse({
+        success: false,
+        error: { code: 'INVALID_STATE', message: 'Invalid or expired state parameter' },
+      }, 400);
+    }
+
+    // Get stored redirect URI
+    const redirectUri = await env.RATE_LIMIT_KV.get(`oauth_redirect:${state}`) ||
+      `${env.APP_URL || url.origin}/api/auth/oauth/${provider}/callback`;
+    await env.RATE_LIMIT_KV.delete(`oauth_redirect:${state}`);
+
+    // Handle OAuth callback
+    const result = await handleOAuthCallback(provider, env, code, redirectUri);
+
+    if (result.success && result.data) {
+      // Redirect to frontend with token
+      const frontendUrl = env.APP_URL || url.origin;
+      return Response.redirect(
+        `${frontendUrl}/auth/callback?token=${result.data.token}&email=${encodeURIComponent(result.data.user.email)}`,
+        302
+      );
+    } else {
+      // Redirect to frontend with error
+      const frontendUrl = env.APP_URL || url.origin;
+      return Response.redirect(
+        `${frontendUrl}/login?error=${encodeURIComponent(result.error?.message || 'OAuth failed')}`,
+        302
+      );
+    }
   }
 
   // Plans endpoint (public)

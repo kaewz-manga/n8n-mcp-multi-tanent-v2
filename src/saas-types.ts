@@ -165,6 +165,17 @@ export interface Env {
   JWT_SECRET: string;
   ENCRYPTION_KEY: string;
 
+  // OAuth - GitHub
+  GITHUB_CLIENT_ID?: string;
+  GITHUB_CLIENT_SECRET?: string;
+
+  // OAuth - Google
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+
+  // App URL (for OAuth redirect)
+  APP_URL?: string;
+
   // Optional
   ENVIRONMENT?: 'development' | 'staging' | 'production';
 }

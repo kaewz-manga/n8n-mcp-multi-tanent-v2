@@ -243,3 +243,26 @@ export async function getUsage(): Promise<ApiResponse<Usage>> {
 export async function getPlans(): Promise<ApiResponse<{ plans: Plan[] }>> {
   return request('/api/plans');
 }
+
+// ============================================
+// OAuth API
+// ============================================
+
+export interface OAuthProvider {
+  id: 'github' | 'google';
+  name: string;
+  enabled: boolean;
+}
+
+export async function getOAuthProviders(): Promise<ApiResponse<{ providers: OAuthProvider[] }>> {
+  return request('/api/auth/oauth/providers');
+}
+
+export async function getOAuthUrl(provider: 'github' | 'google'): Promise<ApiResponse<{ url: string; state: string }>> {
+  const redirectUri = `${window.location.origin}/auth/callback`;
+  return request(`/api/auth/oauth/${provider}?redirect_uri=${encodeURIComponent(redirectUri)}`);
+}
+
+export function handleOAuthToken(token: string): void {
+  setToken(token);
+}

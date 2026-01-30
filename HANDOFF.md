@@ -4,8 +4,8 @@
 
 **Updated**: 2026-01-31
 **GitHub**: https://github.com/kaewz-manga/n8n-mcp-multi-tanent-v2
-**Production**: https://n8n-mcp-saas.suphakitm99.workers.dev
-**Dashboard**: https://n8n-mcp-dashboard.pages.dev (Cloudflare Pages)
+**Production Worker**: https://n8n-mcp-saas.suphakitm99.workers.dev
+**Dashboard**: https://n8n-mcp-dashboard.pages.dev
 
 ---
 
@@ -19,49 +19,111 @@
 
 ## สถานะปัจจุบัน (2026-01-31)
 
-### ✅ ทำเสร็จแล้ว
+### ✅ ทำเสร็จ + Deploy แล้ว
 
 - **SaaS Backend** - Auth, Connections, API Keys, Rate Limiting, Usage Tracking
 - **31 MCP Tools** - n8n Public API coverage (Community Edition)
-- **Cloudflare D1** - Database สร้าง + schema apply แล้ว
+- **Cloudflare D1** - Database สร้าง + schema apply + `stripe_customer_id` migration แล้ว
 - **Cloudflare KV** - Rate limiting cache
 - **GitHub Actions** - CI/CD (typecheck + deploy)
 - **E2E Test ผ่าน** - Register → Login → Add Connection → MCP Initialize → list_workflows → list_tags
-- **Bug fix** - getConnectionById missing .bind(), try-catch on /mcp endpoint
-- **Dashboard deploy config** - React SPA พร้อม deploy ขึ้น Cloudflare Pages (wrangler.toml, _redirects, .env.production)
-- **Stripe integration** - Checkout session, billing portal, webhook handler (signature verification)
-- **OAuth endpoints** - GitHub + Google OAuth flow พร้อมใช้ (code + endpoints ครบ)
-- **stdio-server.js SaaS mode** - รองรับทั้ง SaaS API key mode และ direct n8n mode
+- **Dashboard deployed** - React 19 SPA บน Cloudflare Pages (https://n8n-mcp-dashboard.pages.dev)
+- **Worker deployed** - Cloudflare Workers v2.0.0 (Version ID: 2f85149d-c161-48db-bccc-ca83a61ce7a8)
+- **Stripe integration** - `src/stripe.ts` - Checkout session, billing portal, webhook handler (HMAC-SHA256 signature verification)
+- **OAuth endpoints** - GitHub + Google OAuth flow ครบ (code + endpoints + CSRF protection)
+- **stdio-server.js** - รองรับทั้ง SaaS API key mode (`saas_xxx`) และ Direct n8n mode
 
-### ❌ ยังไม่ทำ (ต้อง set secrets บน Cloudflare)
+### ✅ Bug fixes
 
-- **Dashboard deploy** - `cd dashboard && npm run deploy` (ต้อง `npm install` ก่อน)
-- **OAuth client IDs** - ต้องสร้าง OAuth App บน GitHub/Google แล้ว set secrets
-- **Stripe secrets** - ต้องสร้าง Stripe account, products, prices แล้ว set secrets
-- **DB migration** - ต้อง run `ALTER TABLE users ADD COLUMN stripe_customer_id TEXT` บน production D1
+- `getConnectionById` missing `.bind(id)` → Fixed (commit 84e1265)
+- `/mcp` endpoint missing try-catch → Fixed (commit 84e1265)
+- Dashboard `tsc -b` fails with Vite 7 + TS 5.9 → Fixed: ใช้ `vite build` เดี่ยว (commit d535095)
+- `n8n_list_credentials` returns 405 on Community Edition → Removed tool
+
+### ⏳ รอ set secrets (ต้องทำ manual)
+
+- **Stripe secrets** - ต้องสร้าง Stripe account, products, prices แล้ว set:
+  - `wrangler secret put STRIPE_SECRET_KEY`
+  - `wrangler secret put STRIPE_WEBHOOK_SECRET`
+  - `wrangler secret put STRIPE_PRICE_STARTER`
+  - `wrangler secret put STRIPE_PRICE_PRO`
+  - `wrangler secret put STRIPE_PRICE_ENTERPRISE`
+  - Add webhook endpoint in Stripe Dashboard: `https://n8n-mcp-saas.suphakitm99.workers.dev/api/webhooks/stripe`
+- **OAuth secrets** - ต้องสร้าง OAuth App แล้ว set:
+  - `wrangler secret put GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET`
+  - `wrangler secret put GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET`
+  - `wrangler secret put APP_URL` → `https://n8n-mcp-dashboard.pages.dev`
+- **Re-deploy worker** หลัง set secrets: `npx wrangler deploy`
+
+ดู `docs/DEPLOYMENT.md` Step 9-11 สำหรับ instructions ละเอียด
 
 ---
 
 ## Cloudflare Resources
 
-| Resource | ID | Type |
-|----------|-----|------|
+| Resource | ID/Name | Type |
+|----------|---------|------|
 | **Worker** | n8n-mcp-saas | Cloudflare Workers |
 | **D1 Database** | `705840e0-4663-430e-9f3b-3778c209e525` | n8n-mcp-saas-db (APAC/SIN) |
 | **KV Namespace** | `45d5d994b649440ab34e4f0a3a5eaa66` | RATE_LIMIT_KV |
+| **Pages** | n8n-mcp-dashboard | Cloudflare Pages |
 | **Account ID** | `ed77f292a2c8173c4fbadebcd1fbe8fc` | Cloudflare Account |
-| **Pages** | n8n-mcp-dashboard | Cloudflare Pages (dashboard SPA) |
 
-### Secrets (set on Cloudflare Workers)
+### Secrets ที่ set แล้วบน Workers
 
 - `JWT_SECRET` - 32-byte hex for JWT signing
 - `ENCRYPTION_KEY` - 32-byte hex for AES-GCM encryption of n8n API keys
-- `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` - GitHub OAuth (optional)
-- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` - Google OAuth (optional)
-- `APP_URL` - Frontend URL for OAuth redirects (optional)
-- `STRIPE_SECRET_KEY` - Stripe API key (optional)
-- `STRIPE_WEBHOOK_SECRET` - Stripe webhook signing secret (optional)
-- `STRIPE_PRICE_STARTER` / `STRIPE_PRICE_PRO` / `STRIPE_PRICE_ENTERPRISE` - Stripe Price IDs (optional)
+
+### Secrets ที่ยังไม่ set (optional features)
+
+- `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` - GitHub OAuth
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` - Google OAuth
+- `APP_URL` - Frontend URL for OAuth redirects
+- `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` - Stripe billing
+- `STRIPE_PRICE_STARTER` / `STRIPE_PRICE_PRO` / `STRIPE_PRICE_ENTERPRISE` - Stripe Price IDs
+
+---
+
+## Architecture Overview
+
+```
+┌─────────────────┐     ┌──────────────────────────────┐
+│  Claude Desktop  │     │  Dashboard (React 19 SPA)    │
+│  Cursor / etc.   │     │  n8n-mcp-dashboard.pages.dev │
+└────────┬────────┘     └─────────────┬────────────────┘
+         │ MCP (JSON-RPC)             │ REST API
+         │ Bearer saas_xxx            │ Bearer JWT
+         ▼                            ▼
+┌──────────────────────────────────────────────┐
+│  Cloudflare Worker (n8n-mcp-saas)            │
+│  n8n-mcp-saas.suphakitm99.workers.dev        │
+│                                              │
+│  ├── /mcp          → MCP Protocol Handler    │
+│  ├── /api/auth/*   → Register, Login, OAuth  │
+│  ├── /api/*        → Connections, Usage, etc. │
+│  ├── /api/billing/* → Stripe Checkout/Portal │
+│  └── /api/webhooks/stripe → Stripe Webhooks  │
+│                                              │
+│  D1 Database ──── KV (Rate Limit Cache)      │
+└──────────────────────┬───────────────────────┘
+                       │ n8n Public API
+                       ▼
+               ┌───────────────┐
+               │  n8n Instance  │
+               │  (Customer's)  │
+               └───────────────┘
+```
+
+### stdio-server.js (Claude Desktop/Code)
+
+```
+┌─────────────────┐     stdio      ┌──────────────┐
+│  Claude Desktop  │ ◄──────────► │ stdio-server   │
+│  or Claude Code  │               │               │
+└─────────────────┘               │ SaaS mode:    │──► Worker ──► n8n
+                                  │ Direct mode:  │──────────────► n8n
+                                  └──────────────┘
+```
 
 ---
 
@@ -70,94 +132,144 @@
 ```
 n8n-mcp-workers/
 ├── src/
-│   ├── index.ts          # Main Worker - API + MCP handler
-│   ├── auth.ts           # Auth middleware - register, login, API key validation
-│   ├── db.ts             # D1 database layer - all CRUD
-│   ├── crypto-utils.ts   # Crypto - PBKDF2, AES-GCM, JWT, API key gen
-│   ├── oauth.ts          # OAuth - GitHub + Google
-│   ├── stripe.ts         # Stripe billing - checkout, portal, webhooks
-│   ├── saas-types.ts     # TypeScript types
-│   ├── n8n-client.ts     # n8n API client
-│   ├── tools.ts          # 31 MCP tool definitions
-│   └── types.ts          # Base types
+│   ├── index.ts          # Main Worker - API routes + MCP handler (~900 lines)
+│   ├── auth.ts           # Auth - register, login, API key validation (~530 lines)
+│   ├── db.ts             # D1 database layer - all CRUD (~410 lines)
+│   ├── crypto-utils.ts   # PBKDF2, AES-GCM, JWT, API key gen (~345 lines)
+│   ├── oauth.ts          # GitHub + Google OAuth flow (~330 lines)
+│   ├── stripe.ts         # Stripe checkout, portal, webhooks (~295 lines)
+│   ├── saas-types.ts     # TypeScript types + Env interface (~215 lines)
+│   ├── n8n-client.ts     # n8n API client (~215 lines)
+│   ├── tools.ts          # 31 MCP tool definitions (~375 lines)
+│   └── types.ts          # Base MCP types (~75 lines)
 ├── dashboard/            # React 19 SPA (Cloudflare Pages)
-│   ├── src/pages/        # Landing, Login, Register, Dashboard, Connections, Usage, Settings
-│   ├── src/lib/api.ts    # API client with billing functions
-│   ├── wrangler.toml     # Cloudflare Pages config
-│   ├── .env.production   # Production API URL
-│   └── public/_redirects # SPA routing
+│   ├── src/
+│   │   ├── App.tsx           # Router + Protected/Public routes
+│   │   ├── pages/
+│   │   │   ├── Landing.tsx   # Marketing page + pricing
+│   │   │   ├── Login.tsx     # Email + OAuth login
+│   │   │   ├── Register.tsx  # Email registration
+│   │   │   ├── AuthCallback.tsx # OAuth callback handler
+│   │   │   ├── Dashboard.tsx # Overview + stats + connections
+│   │   │   ├── Connections.tsx # Manage n8n connections + API keys
+│   │   │   ├── Usage.tsx     # Usage statistics
+│   │   │   └── Settings.tsx  # Profile, password, MCP config, danger zone
+│   │   ├── components/Layout.tsx  # Sidebar navigation
+│   │   ├── contexts/AuthContext.tsx # Auth state management
+│   │   └── lib/api.ts       # API client (auth, connections, usage, billing, OAuth)
+│   ├── wrangler.toml         # Cloudflare Pages config
+│   ├── .env.production       # VITE_API_URL=https://n8n-mcp-saas.suphakitm99.workers.dev
+│   └── public/_redirects     # SPA routing: /* /index.html 200
 ├── tests/
 │   ├── crypto-utils.test.ts
 │   └── tools.test.ts
-├── schema.sql            # D1 database schema (6 tables + stripe_customer_id)
+├── schema.sql            # D1 schema (6 tables + indexes)
 ├── stdio-server.js       # Claude Desktop/Code stdio server (SaaS + Direct modes)
-├── wrangler.toml         # Cloudflare Workers config (D1 + KV bindings)
+├── wrangler.toml         # Workers config (D1 + KV bindings)
 ├── docs/
 │   ├── SAAS_PLAN.md      # Full SaaS business plan
-│   └── DEPLOYMENT.md     # Deployment guide (OAuth + Stripe + Dashboard setup)
+│   └── DEPLOYMENT.md     # Deploy guide (Steps 1-11: D1, KV, secrets, OAuth, Stripe, Pages)
 ├── .github/workflows/
 │   └── deploy.yml        # GitHub Actions (typecheck + deploy)
+├── HANDOFF.md            # This file
 └── package.json
 ```
 
 ---
 
-## API Endpoints
+## API Endpoints (18 total)
 
-### Management API (`/api/*`)
+### Public (no auth)
 
-| Endpoint | Method | Auth | Description |
-|----------|--------|------|-------------|
-| `/api/auth/register` | POST | - | สมัครด้วย email+password |
-| `/api/auth/login` | POST | - | Login ได้ JWT token |
-| `/api/auth/oauth/providers` | GET | - | ดู OAuth providers ที่เปิด |
-| `/api/auth/oauth/:provider` | GET | - | เริ่ม OAuth flow |
-| `/api/auth/oauth/:provider/callback` | GET | - | OAuth callback |
-| `/api/plans` | GET | - | ดู pricing plans |
-| `/api/webhooks/stripe` | POST | Signature | Stripe webhook handler |
-| `/api/connections` | GET | JWT | ดู n8n connections ทั้งหมด |
-| `/api/connections` | POST | JWT | เพิ่ม n8n instance + ได้ `saas_xxx` key |
-| `/api/connections/:id` | DELETE | JWT | ลบ connection |
-| `/api/connections/:id/api-keys` | POST | JWT | สร้าง API key ใหม่ |
-| `/api/api-keys/:id` | DELETE | JWT | ลบ API key |
-| `/api/usage` | GET | JWT | ดูสถิติการใช้งาน |
-| `/api/user/profile` | GET | JWT | ดูข้อมูล user |
-| `/api/user/password` | PUT | JWT | เปลี่ยนรหัสผ่าน |
-| `/api/user` | DELETE | JWT | ลบ account |
-| `/api/billing/checkout` | POST | JWT | สร้าง Stripe checkout session |
-| `/api/billing/portal` | POST | JWT | สร้าง Stripe billing portal |
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/` | GET | Health check |
+| `/api/auth/register` | POST | Register (email+password) |
+| `/api/auth/login` | POST | Login → JWT token |
+| `/api/auth/oauth/providers` | GET | List enabled OAuth providers |
+| `/api/auth/oauth/:provider` | GET | Get OAuth authorize URL |
+| `/api/auth/oauth/:provider/callback` | GET | OAuth callback → redirect with JWT |
+| `/api/plans` | GET | List pricing plans |
 
-### MCP API (`/mcp`)
+### Webhook (signature verified)
 
-| Method | Auth | Description |
-|--------|------|-------------|
-| POST `/mcp` | Bearer `saas_xxx` | JSON-RPC 2.0 MCP protocol |
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/webhooks/stripe` | POST | Stripe webhook (checkout.session.completed, subscription.deleted) |
+
+### Protected (JWT required)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/user/profile` | GET | User profile |
+| `/api/user/password` | PUT | Change password |
+| `/api/user` | DELETE | Delete account (soft delete) |
+| `/api/connections` | GET | List n8n connections + API keys |
+| `/api/connections` | POST | Add n8n connection → returns `saas_xxx` key |
+| `/api/connections/:id` | DELETE | Delete connection |
+| `/api/connections/:id/api-keys` | POST | Generate new API key |
+| `/api/api-keys/:id` | DELETE | Revoke API key |
+| `/api/usage` | GET | Usage statistics (requests, limits, success rate) |
+| `/api/billing/checkout` | POST | Create Stripe checkout session |
+| `/api/billing/portal` | POST | Create Stripe billing portal |
+
+### MCP (SaaS API key required)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/mcp` | POST | MCP JSON-RPC 2.0 (initialize, tools/list, tools/call) |
 
 ---
 
 ## 31 MCP Tools
 
-### Workflow (10)
-`n8n_list_workflows`, `n8n_get_workflow`, `n8n_create_workflow`, `n8n_update_workflow`, `n8n_delete_workflow`, `n8n_activate_workflow`, `n8n_deactivate_workflow`, `n8n_execute_workflow`, `n8n_get_workflow_tags`, `n8n_update_workflow_tags`
-
-### Execution (4)
-`n8n_list_executions`, `n8n_get_execution`, `n8n_delete_execution`, `n8n_retry_execution`
-
-### Credential (4) - `n8n_list_credentials` removed (405 on Community Edition)
-`n8n_create_credential`, `n8n_update_credential`, `n8n_delete_credential`, `n8n_get_credential_schema`
-
-### Tag (5)
-`n8n_list_tags`, `n8n_get_tag`, `n8n_create_tag`, `n8n_update_tag`, `n8n_delete_tag`
-
-### Variable (4)
-`n8n_list_variables`, `n8n_create_variable`, `n8n_update_variable`, `n8n_delete_variable`
-
-### User (4)
-`n8n_list_users`, `n8n_get_user`, `n8n_delete_user`, `n8n_update_user_role`
+| Category | Tools |
+|----------|-------|
+| **Workflow** (10) | list, get, create, update, delete, activate, deactivate, execute, get_tags, update_tags |
+| **Execution** (4) | list, get, delete, retry |
+| **Credential** (4) | create, update, delete, get_schema |
+| **Tag** (5) | list, get, create, update, delete |
+| **Variable** (4) | list, create, update, delete |
+| **User** (4) | list, get, delete, update_role |
 
 ---
 
-## Pricing Plans (in D1 database)
+## Database Schema (D1)
+
+6 tables: `users`, `n8n_connections`, `api_keys`, `usage_logs`, `usage_monthly`, `plans`
+
+| Table | Key Fields |
+|-------|------------|
+| **users** | id, email, password_hash, oauth_provider, oauth_id, plan, status, stripe_customer_id |
+| **n8n_connections** | id, user_id, name, n8n_url, n8n_api_key_encrypted, status |
+| **api_keys** | id, user_id, connection_id, key_hash (SHA-256), key_prefix, status |
+| **usage_logs** | id, user_id, api_key_id, connection_id, tool_name, status, response_time_ms |
+| **usage_monthly** | id, user_id, year_month, request_count, success_count, error_count |
+| **plans** | id (free/starter/pro/enterprise), monthly_request_limit, max_connections, price_monthly |
+
+---
+
+## Auth Flow
+
+```
+Email/Password:
+  Register → PBKDF2 hash → user created (plan: free)
+  Login → verify hash → JWT token (24h)
+
+OAuth (GitHub/Google):
+  Redirect → provider → callback → exchange code → get email → create/find user → JWT → redirect to dashboard
+
+MCP:
+  Bearer saas_xxx → SHA-256 hash → lookup api_keys → get user + connection → decrypt n8n key (AES-GCM) → call n8n API → track usage
+
+Stripe:
+  Checkout → Stripe hosted page → webhook (checkout.session.completed) → update plan
+  Cancel → webhook (customer.subscription.deleted) → downgrade to free
+```
+
+---
+
+## Pricing Plans
 
 | Plan | Price | Requests/Month | Connections |
 |------|-------|----------------|-------------|
@@ -168,30 +280,35 @@ n8n-mcp-workers/
 
 ---
 
-## Database Schema (D1)
+## Commands
 
-6 tables: `users`, `n8n_connections`, `api_keys`, `usage_logs`, `usage_monthly`, `plans`
+```bash
+# Worker
+npm install                  # Install deps
+npm run typecheck            # TypeScript check (worker only)
+npm test                     # Run tests (vitest)
+npx wrangler dev             # Local dev server
+npx wrangler deploy          # Deploy to Cloudflare
 
-- Users: email + password_hash (PBKDF2) or OAuth + stripe_customer_id
-- Connections: n8n URL + encrypted API key (AES-GCM)
-- API keys: hashed (SHA-256), prefix stored for display
-- Usage: per-request logs + monthly aggregation
+# Dashboard
+cd dashboard
+npm install                  # Install deps
+npm run dev                  # Local dev (Vite)
+npm run build                # Build (vite build)
+npm run deploy               # Build + deploy to Cloudflare Pages
+npm run deploy:preview       # Build + deploy to preview branch
+
+# Database
+npx wrangler d1 execute n8n-mcp-saas-db --remote --file=./schema.sql  # Apply schema
+npx wrangler d1 execute n8n-mcp-saas-db --remote --command "SELECT ..." # Query
+
+# CI/CD
+gh workflow run deploy.yml   # Trigger GitHub Actions
+```
 
 ---
 
-## Auth Flow
-
-```
-1. Register (email+password or OAuth) → user created (plan: free)
-2. Login → JWT token (24h expiry)
-3. Add Connection (JWT + n8n URL + n8n API key) → connection created + saas_xxx key returned
-4. Use MCP (Bearer saas_xxx) → authenticate → decrypt n8n key → call n8n API → track usage
-5. Upgrade plan → Stripe checkout → webhook updates plan
-```
-
----
-
-## stdio-server.js Modes
+## stdio-server.js Usage
 
 ```bash
 # SaaS mode (connects through SaaS platform)
@@ -203,41 +320,27 @@ node stdio-server.js <N8N_URL> <N8N_API_KEY>
 N8N_URL=https://your-n8n.com N8N_API_KEY=your_key node stdio-server.js
 ```
 
----
-
-## Commands
-
-```bash
-# Install
-npm install
-
-# Type check
-npm run typecheck
-
-# Run tests
-npm test
-
-# Local dev
-npx wrangler dev
-
-# Deploy worker
-npx wrangler deploy
-
-# Deploy dashboard
-cd dashboard && npm install && npm run deploy
-
-# GitHub Actions deploy
-gh workflow run deploy.yml
+Claude Desktop config:
+```json
+{
+  "mcpServers": {
+    "n8n": {
+      "command": "node",
+      "args": ["path/to/stdio-server.js", "saas_YOUR_API_KEY"]
+    }
+  }
+}
 ```
 
 ---
 
 ## Known Issues / Bugs Fixed
 
-1. **getConnectionById missing .bind(id)** - D1 query crashed with "Wrong number of parameter bindings" → Fixed (commit 84e1265)
-2. **n8n_list_credentials returns 405** - n8n Community Edition blocks GET /api/v1/credentials → Removed tool
-3. **npm start doesn't pass args** - stdio-server.js must use `node stdio-server.js` directly
-4. **ENCRYPTION_KEY with newline** - `echo` adds trailing newline, use `printf` instead
+1. **getConnectionById missing .bind(id)** - D1 query crash → Fixed (84e1265)
+2. **n8n_list_credentials 405** - Community Edition blocks GET → Removed tool
+3. **npm start doesn't pass args** - Must use `node stdio-server.js` directly
+4. **ENCRYPTION_KEY newline** - `echo` adds `\n`, use `printf` instead
+5. **Dashboard tsc -b fails** - Vite 7 + TS 5.9 type def incompatibility → Use `vite build` directly (d535095)
 
 ---
 
@@ -249,24 +352,42 @@ gh workflow run deploy.yml
 
 ---
 
-## Next Steps (Priority Order)
+## Git History (Key Commits)
 
-1. **Deploy dashboard** - `cd dashboard && npm install && npm run deploy`
-2. **Set Stripe secrets** - Create Stripe account, products, prices → set wrangler secrets
-3. **Set OAuth secrets** - Create GitHub/Google OAuth apps → set wrangler secrets
-4. **DB migration** - `wrangler d1 execute n8n-mcp-saas-db --command "ALTER TABLE users ADD COLUMN stripe_customer_id TEXT"`
-5. **Re-deploy worker** - `npx wrangler deploy` (to pick up Stripe + OAuth code)
+```
+d535095 Fix dashboard build script to use vite build directly
+28486e4 Add Stripe billing, dashboard deploy config, OAuth docs, and SaaS stdio mode
+bf4cad5 Update HANDOFF.md with full SaaS platform status
+84e1265 Fix missing .bind() in getConnectionById and add error handling for MCP endpoint
+7219dd0 Configure Cloudflare D1 and KV for SaaS platform
+929a09e Merge PR #1: Add SaaS platform planning documentation
+```
+
+---
+
+## Next Steps
+
+1. **Set Stripe secrets** → สร้าง Stripe account + products + prices → `wrangler secret put` (ดู DEPLOYMENT.md Step 10)
+2. **Set OAuth secrets** → สร้าง GitHub/Google OAuth apps → `wrangler secret put` (ดู DEPLOYMENT.md Step 9)
+3. **Set APP_URL** → `wrangler secret put APP_URL` = `https://n8n-mcp-dashboard.pages.dev`
+4. **Re-deploy worker** → `npx wrangler deploy` (หลัง set secrets)
+5. **Custom domain** → ชี้ domain ไปที่ Workers + Pages (optional)
+6. **Monitoring** → ตั้ง Cloudflare Analytics + Stripe Dashboard alerts
 
 ---
 
 ## Key Files to Read
 
-1. `docs/SAAS_PLAN.md` - Full business plan, architecture, API spec
-2. `docs/DEPLOYMENT.md` - Deployment guide with OAuth + Stripe setup
-3. `src/index.ts` - Main entry point (API routes + MCP handler)
-4. `src/auth.ts` - Auth flow (register, login, API key validation)
-5. `src/stripe.ts` - Stripe billing integration
-6. `schema.sql` - Database schema
+| Priority | File | Description |
+|----------|------|-------------|
+| 1 | `src/index.ts` | Main entry point - all API routes + MCP handler |
+| 2 | `src/auth.ts` | Auth flow - register, login, API key validation |
+| 3 | `src/stripe.ts` | Stripe billing - checkout, portal, webhooks |
+| 4 | `src/db.ts` | Database layer - all CRUD operations |
+| 5 | `schema.sql` | D1 database schema |
+| 6 | `docs/DEPLOYMENT.md` | Full deployment guide (11 steps) |
+| 7 | `docs/SAAS_PLAN.md` | Business plan + architecture |
+| 8 | `dashboard/src/lib/api.ts` | Frontend API client |
 
 ---
 

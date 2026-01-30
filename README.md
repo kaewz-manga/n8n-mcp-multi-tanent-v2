@@ -9,7 +9,7 @@ A lightweight, serverless MCP server that provides complete access to n8n Public
 ## Features
 
 - **Multi-tenant** - One MCP server, multiple users with different n8n instances
-- **32 MCP Tools** - Complete n8n Public API coverage (Community Edition)
+- **31 MCP Tools** - Complete n8n Public API coverage (Community Edition)
 - **Serverless** - Deploy on Cloudflare Workers (no infrastructure management)
 - **Zero Configuration** - No OAuth complexity, just pass headers
 - **Type-safe** - Full TypeScript support with type definitions
@@ -258,7 +258,7 @@ All API calls use n8n's **Public API** (`/api/v1/...`) which requires an API key
 
 ---
 
-## Available Tools (32 Total)
+## Available Tools (31 Total)
 
 ### Workflow Management (10 tools)
 
@@ -284,11 +284,10 @@ All API calls use n8n's **Public API** (`/api/v1/...`) which requires an API key
 | `n8n_delete_execution` | Delete execution |
 | `n8n_retry_execution` | Retry failed execution |
 
-### Credential Management (5 tools)
+### Credential Management (4 tools)
 
 | Tool | Description |
 |------|-------------|
-| `n8n_list_credentials` | List all credentials |
 | `n8n_create_credential` | Create credential |
 | `n8n_update_credential` | Update credential |
 | `n8n_delete_credential` | Delete credential |
@@ -417,10 +416,9 @@ claude mcp add n8n-no1 -- node /path/to/stdio-server.js https://your-n8n.com api
 
 ### "n8n API Error (405): GET method not allowed"
 
-**Cause**: Some n8n API endpoints don't support certain methods (e.g., `/api/v1/credentials` doesn't support GET).
+**Cause**: n8n Community Edition blocks GET on some endpoints (e.g., `/api/v1/credentials`).
 
-**Note**: This is an n8n API limitation, not an MCP issue. The affected tools:
-- `n8n_list_credentials` - returns 405 error
+**Note**: `n8n_list_credentials` has been removed from this server because of this limitation.
 
 ### "n8n API Error (403): License does not allow..."
 

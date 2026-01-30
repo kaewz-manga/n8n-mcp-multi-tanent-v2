@@ -828,19 +828,23 @@ export default {
 
     // MCP endpoint
     if (path === '/mcp' && request.method === 'POST') {
-      // Authenticate
-      const { context, error } = await authenticateMcpRequest(request, env);
+      try {
+        // Authenticate
+        const { context, error } = await authenticateMcpRequest(request, env);
 
-      if (error) {
-        // Return JSON-RPC error for MCP clients
-        return jsonRpcError(null, -32000, error.error?.message || 'Authentication failed');
+        if (error) {
+          // Return JSON-RPC error for MCP clients
+          return jsonRpcError(null, -32000, error.error?.message || 'Authentication failed');
+        }
+
+        if (!context) {
+          return jsonRpcError(null, -32000, 'Authentication failed');
+        }
+
+        return handleMcpRequest(request, env, context);
+      } catch (err: any) {
+        return jsonRpcError(null, -32603, `Internal error: ${err.message}`);
       }
-
-      if (!context) {
-        return jsonRpcError(null, -32000, 'Authentication failed');
-      }
-
-      return handleMcpRequest(request, env, context);
     }
 
     // Legacy endpoint (for backward compatibility during migration)

@@ -158,6 +158,7 @@ export async function getConnectionById(
 ): Promise<N8nConnection | null> {
   const result = await db
     .prepare('SELECT * FROM n8n_connections WHERE id = ?')
+    .bind(id)
     .first<N8nConnection>();
 
   return result || null;

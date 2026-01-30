@@ -4,8 +4,13 @@
 
 **Updated**: 2026-01-31
 **GitHub**: https://github.com/kaewz-manga/n8n-mcp-multi-tanent-v2
-**Production Worker**: https://n8n-mcp-saas.suphakitm99.workers.dev
-**Dashboard**: https://n8n-mcp-dashboard.pages.dev
+
+### Production URLs
+
+| Service | Custom Domain | Cloudflare Default |
+|---------|--------------|-------------------|
+| **MCP Server (Worker)** | https://n8n-management-mcp.node2flow.net | https://n8n-mcp-saas.suphakitm99.workers.dev |
+| **Dashboard (Pages)** | https://n8n-management-dashboard.node2flow.net | https://n8n-mcp-dashboard.pages.dev |
 
 ---
 
@@ -27,11 +32,13 @@
 - **Cloudflare KV** - Rate limiting cache
 - **GitHub Actions** - CI/CD (typecheck + deploy)
 - **E2E Test ผ่าน** - Register → Login → Add Connection → MCP Initialize → list_workflows → list_tags
-- **Dashboard deployed** - React 19 SPA บน Cloudflare Pages (https://n8n-mcp-dashboard.pages.dev)
-- **Worker deployed** - Cloudflare Workers v2.0.0 (Version ID: 2f85149d-c161-48db-bccc-ca83a61ce7a8)
+- **Dashboard deployed** - React 19 SPA บน Cloudflare Pages
+- **Worker deployed** - Cloudflare Workers v2.0.0
 - **Stripe integration** - `src/stripe.ts` - Checkout session, billing portal, webhook handler (HMAC-SHA256 signature verification)
-- **OAuth endpoints** - GitHub + Google OAuth flow ครบ (code + endpoints + CSRF protection)
+- **OAuth working** - GitHub + Google OAuth login ใช้งานได้ (tested 2026-01-31)
 - **stdio-server.js** - รองรับทั้ง SaaS API key mode (`saas_xxx`) และ Direct n8n mode
+- **Custom domains** - Worker: `n8n-management-mcp.node2flow.net`, Dashboard: `n8n-management-dashboard.node2flow.net`
+- **Monitoring** - Cloudflare Observability enabled
 
 ### ✅ Bug fixes
 
@@ -39,6 +46,8 @@
 - `/mcp` endpoint missing try-catch → Fixed (commit 84e1265)
 - Dashboard `tsc -b` fails with Vite 7 + TS 5.9 → Fixed: ใช้ `vite build` เดี่ยว (commit d535095)
 - `n8n_list_credentials` returns 405 on Community Edition → Removed tool
+- OAuth `redirect_uri` ใช้ `APP_URL` (Dashboard) แทน Worker origin → Fixed (commit 02fd3fa)
+- Dashboard ส่ง `redirect_uri` ผิด override Worker's callback → Fixed (commit 02fd3fa)
 
 ### ⏳ รอ set secrets (ต้องทำ manual)
 
@@ -48,14 +57,9 @@
   - `wrangler secret put STRIPE_PRICE_STARTER`
   - `wrangler secret put STRIPE_PRICE_PRO`
   - `wrangler secret put STRIPE_PRICE_ENTERPRISE`
-  - Add webhook endpoint in Stripe Dashboard: `https://n8n-mcp-saas.suphakitm99.workers.dev/api/webhooks/stripe`
-- **OAuth secrets** - ต้องสร้าง OAuth App แล้ว set:
-  - `wrangler secret put GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET`
-  - `wrangler secret put GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET`
-  - `wrangler secret put APP_URL` → `https://n8n-mcp-dashboard.pages.dev`
-- **Re-deploy worker** หลัง set secrets: `npx wrangler deploy`
+  - Add webhook endpoint in Stripe Dashboard: `https://n8n-management-mcp.node2flow.net/api/webhooks/stripe`
 
-ดู `docs/DEPLOYMENT.md` Step 9-11 สำหรับ instructions ละเอียด
+ดู `docs/DEPLOYMENT.md` Step 10 สำหรับ instructions ละเอียด
 
 ---
 
@@ -73,39 +77,44 @@
 
 - `JWT_SECRET` - 32-byte hex for JWT signing
 - `ENCRYPTION_KEY` - 32-byte hex for AES-GCM encryption of n8n API keys
+- `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` - GitHub OAuth (working)
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` - Google OAuth (working)
+- `APP_URL` - `https://n8n-management-dashboard.node2flow.net` (OAuth redirect target)
 
 ### Secrets ที่ยังไม่ set (optional features)
 
-- `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` - GitHub OAuth
-- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` - Google OAuth
-- `APP_URL` - Frontend URL for OAuth redirects
 - `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` - Stripe billing
 - `STRIPE_PRICE_STARTER` / `STRIPE_PRICE_PRO` / `STRIPE_PRICE_ENTERPRISE` - Stripe Price IDs
+
+### OAuth Callback URLs (registered)
+
+- **GitHub**: `https://n8n-management-mcp.node2flow.net/api/auth/oauth/github/callback`
+- **Google**: `https://n8n-management-mcp.node2flow.net/api/auth/oauth/google/callback`
 
 ---
 
 ## Architecture Overview
 
 ```
-┌─────────────────┐     ┌──────────────────────────────┐
-│  Claude Desktop  │     │  Dashboard (React 19 SPA)    │
-│  Cursor / etc.   │     │  n8n-mcp-dashboard.pages.dev │
-└────────┬────────┘     └─────────────┬────────────────┘
+┌─────────────────┐     ┌────────────────────────────────────────┐
+│  Claude Desktop  │     │  Dashboard (React 19 SPA)              │
+│  Cursor / etc.   │     │  n8n-management-dashboard.node2flow.net│
+└────────┬────────┘     └─────────────┬──────────────────────────┘
          │ MCP (JSON-RPC)             │ REST API
          │ Bearer saas_xxx            │ Bearer JWT
          ▼                            ▼
-┌──────────────────────────────────────────────┐
-│  Cloudflare Worker (n8n-mcp-saas)            │
-│  n8n-mcp-saas.suphakitm99.workers.dev        │
-│                                              │
-│  ├── /mcp          → MCP Protocol Handler    │
-│  ├── /api/auth/*   → Register, Login, OAuth  │
-│  ├── /api/*        → Connections, Usage, etc. │
-│  ├── /api/billing/* → Stripe Checkout/Portal │
-│  └── /api/webhooks/stripe → Stripe Webhooks  │
-│                                              │
-│  D1 Database ──── KV (Rate Limit Cache)      │
-└──────────────────────┬───────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│  Cloudflare Worker (n8n-mcp-saas)                    │
+│  n8n-management-mcp.node2flow.net                    │
+│                                                      │
+│  ├── /mcp          → MCP Protocol Handler            │
+│  ├── /api/auth/*   → Register, Login, OAuth          │
+│  ├── /api/*        → Connections, Usage, etc.         │
+│  ├── /api/billing/* → Stripe Checkout/Portal         │
+│  └── /api/webhooks/stripe → Stripe Webhooks          │
+│                                                      │
+│  D1 Database ──── KV (Rate Limit Cache)              │
+└──────────────────────┬───────────────────────────────┘
                        │ n8n Public API
                        ▼
                ┌───────────────┐
@@ -158,14 +167,14 @@ n8n-mcp-workers/
 │   │   ├── contexts/AuthContext.tsx # Auth state management
 │   │   └── lib/api.ts       # API client (auth, connections, usage, billing, OAuth)
 │   ├── wrangler.toml         # Cloudflare Pages config
-│   ├── .env.production       # VITE_API_URL=https://n8n-mcp-saas.suphakitm99.workers.dev
+│   ├── .env.production       # VITE_API_URL=https://n8n-management-mcp.node2flow.net
 │   └── public/_redirects     # SPA routing: /* /index.html 200
 ├── tests/
 │   ├── crypto-utils.test.ts
 │   └── tools.test.ts
 ├── schema.sql            # D1 schema (6 tables + indexes)
 ├── stdio-server.js       # Claude Desktop/Code stdio server (SaaS + Direct modes)
-├── wrangler.toml         # Workers config (D1 + KV bindings)
+├── wrangler.toml         # Workers config (D1 + KV bindings + custom domain)
 ├── docs/
 │   ├── SAAS_PLAN.md      # Full SaaS business plan
 │   └── DEPLOYMENT.md     # Deploy guide (Steps 1-11: D1, KV, secrets, OAuth, Stripe, Pages)
@@ -257,7 +266,10 @@ Email/Password:
   Login → verify hash → JWT token (24h)
 
 OAuth (GitHub/Google):
-  Redirect → provider → callback → exchange code → get email → create/find user → JWT → redirect to dashboard
+  Dashboard → Worker /api/auth/oauth/:provider → redirect to provider
+  → user authorizes → provider redirects to Worker /callback
+  → Worker exchanges code → gets email → creates/finds user → JWT
+  → Worker redirects to Dashboard /auth/callback?token=xxx
 
 MCP:
   Bearer saas_xxx → SHA-256 hash → lookup api_keys → get user + connection → decrypt n8n key (AES-GCM) → call n8n API → track usage
@@ -302,6 +314,13 @@ npm run deploy:preview       # Build + deploy to preview branch
 npx wrangler d1 execute n8n-mcp-saas-db --remote --file=./schema.sql  # Apply schema
 npx wrangler d1 execute n8n-mcp-saas-db --remote --command "SELECT ..." # Query
 
+# Secrets (use --env="" to target production)
+wrangler secret put SECRET_NAME --env=""
+
+# Monitoring
+npx wrangler tail             # Real-time logs
+# Cloudflare Dashboard → Workers → n8n-mcp-saas → Analytics
+
 # CI/CD
 gh workflow run deploy.yml   # Trigger GitHub Actions
 ```
@@ -341,6 +360,8 @@ Claude Desktop config:
 3. **npm start doesn't pass args** - Must use `node stdio-server.js` directly
 4. **ENCRYPTION_KEY newline** - `echo` adds `\n`, use `printf` instead
 5. **Dashboard tsc -b fails** - Vite 7 + TS 5.9 type def incompatibility → Use `vite build` directly (d535095)
+6. **OAuth redirect_uri wrong** - Used `APP_URL` (Dashboard) instead of `url.origin` (Worker) → Fixed (02fd3fa)
+7. **Dashboard sent custom redirect_uri** - Overrode Worker's callback URL → Removed from api.ts (02fd3fa)
 
 ---
 
@@ -355,6 +376,9 @@ Claude Desktop config:
 ## Git History (Key Commits)
 
 ```
+7cb3aa2 Add custom domains for Worker and Dashboard
+02fd3fa Fix OAuth redirect_uri to use Worker origin instead of APP_URL
+97edc5d Update HANDOFF.md with complete deployment status and architecture docs
 d535095 Fix dashboard build script to use vite build directly
 28486e4 Add Stripe billing, dashboard deploy config, OAuth docs, and SaaS stdio mode
 bf4cad5 Update HANDOFF.md with full SaaS platform status
@@ -368,11 +392,10 @@ bf4cad5 Update HANDOFF.md with full SaaS platform status
 ## Next Steps
 
 1. **Set Stripe secrets** → สร้าง Stripe account + products + prices → `wrangler secret put` (ดู DEPLOYMENT.md Step 10)
-2. **Set OAuth secrets** → สร้าง GitHub/Google OAuth apps → `wrangler secret put` (ดู DEPLOYMENT.md Step 9)
-3. **Set APP_URL** → `wrangler secret put APP_URL` = `https://n8n-mcp-dashboard.pages.dev`
-4. **Re-deploy worker** → `npx wrangler deploy` (หลัง set secrets)
-5. **Custom domain** → ชี้ domain ไปที่ Workers + Pages (optional)
-6. **Monitoring** → ตั้ง Cloudflare Analytics + Stripe Dashboard alerts
+2. **Update OAuth callbacks** → เปลี่ยน callback URLs ใน GitHub/Google OAuth Apps ให้ตรงกับ custom domain ใหม่
+3. **End-to-end test** → ทดสอบ OAuth login ผ่าน custom domain
+4. **Landing page** → ปรับ Landing.tsx ให้แสดงข้อมูลสินค้าจริง
+5. **Production readiness** → Rate limit tuning, error alerting, backup strategy
 
 ---
 

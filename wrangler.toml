@@ -6,7 +6,7 @@ workers_dev = true
 
 # Custom Domain
 routes = [
-  { pattern = "n8n-management-api.node2flow.net", custom_domain = true }
+  { pattern = "n8n-management-mcp.node2flow.net", custom_domain = true }
 ]
 
 # Observability

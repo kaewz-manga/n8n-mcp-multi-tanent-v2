@@ -82,9 +82,6 @@ async function handleToolCall(
         break;
 
       // ========== Credential operations ==========
-      case 'n8n_list_credentials':
-        result = await client.listCredentials();
-        break;
       case 'n8n_create_credential':
         result = await client.createCredential(args);
         break;

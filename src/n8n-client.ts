@@ -116,9 +116,7 @@ export class N8nClient {
   }
 
   // Credential Methods (Public API: /api/v1/)
-  async listCredentials() {
-    return this.request('/api/v1/credentials', { method: 'GET' });
-  }
+  // Note: listCredentials removed - n8n Community Edition returns 405 on GET /api/v1/credentials
 
   async createCredential(credential: any) {
     return this.request('/api/v1/credentials', {

@@ -166,15 +166,8 @@ export const TOOLS = [
     },
   },
 
-  // ========== Credential Tools (5) ==========
-  {
-    name: 'n8n_list_credentials',
-    description: 'Retrieve all stored API keys and authentication credentials. Returns credential ID, name, and type (OAuth, API key, etc). Use this to find credentials before assigning them to workflow nodes. Sensitive data is not included.',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
+  // ========== Credential Tools (4) ==========
+  // Note: n8n_list_credentials removed - n8n Community Edition returns 405 on GET /api/v1/credentials
   {
     name: 'n8n_create_credential',
     description: 'Store new API credentials for services like GitHub, Slack, or databases. Provide credential type, descriptive name, and authentication data. Use get_credential_schema first to see required fields for each type.',

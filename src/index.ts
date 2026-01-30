@@ -304,7 +304,7 @@ async function handleManagementApi(
   if (oauthInitMatch && method === 'GET') {
     const provider = oauthInitMatch[1] as 'github' | 'google';
     const url = new URL(request.url);
-    const redirectUri = url.searchParams.get('redirect_uri') || `${env.APP_URL || url.origin}/api/auth/oauth/${provider}/callback`;
+    const redirectUri = url.searchParams.get('redirect_uri') || `${url.origin}/api/auth/oauth/${provider}/callback`;
 
     // Check if provider is configured
     if (provider === 'github' && !env.GITHUB_CLIENT_ID) {
@@ -373,7 +373,7 @@ async function handleManagementApi(
 
     // Get stored redirect URI
     const redirectUri = await env.RATE_LIMIT_KV.get(`oauth_redirect:${state}`) ||
-      `${env.APP_URL || url.origin}/api/auth/oauth/${provider}/callback`;
+      `${url.origin}/api/auth/oauth/${provider}/callback`;
     await env.RATE_LIMIT_KV.delete(`oauth_redirect:${state}`);
 
     // Handle OAuth callback

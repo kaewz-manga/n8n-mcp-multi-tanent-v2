@@ -302,8 +302,7 @@ export async function getOAuthProviders(): Promise<ApiResponse<{ providers: OAut
 }
 
 export async function getOAuthUrl(provider: 'github' | 'google'): Promise<ApiResponse<{ url: string; state: string }>> {
-  const redirectUri = `${window.location.origin}/auth/callback`;
-  return request(`/api/auth/oauth/${provider}?redirect_uri=${encodeURIComponent(redirectUri)}`);
+  return request(`/api/auth/oauth/${provider}`);
 }
 
 export function handleOAuthToken(token: string): void {

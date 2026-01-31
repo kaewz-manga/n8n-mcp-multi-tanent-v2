@@ -61,7 +61,7 @@ import { createCheckoutSession, createBillingPortalSession, handleStripeWebhook 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-N8N-URL, X-N8N-API-KEY',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-N8N-URL, X-N8N-API-KEY, X-Connection-Id',
 };
 
 // ============================================
@@ -231,20 +231,6 @@ async function handleToolCall(
         break;
       case 'n8n_delete_tag':
         result = await client.deleteTag(args.id);
-        break;
-
-      // Variable operations
-      case 'n8n_list_variables':
-        result = await client.listVariables();
-        break;
-      case 'n8n_create_variable':
-        result = await client.createVariable(args.key, args.value, args.type);
-        break;
-      case 'n8n_update_variable':
-        result = await client.updateVariable(args.id, args.key, args.value);
-        break;
-      case 'n8n_delete_variable':
-        result = await client.deleteVariable(args.id);
         break;
 
       // User operations
@@ -733,23 +719,6 @@ async function handleManagementApi(
     }
     if (tagMatch && method === 'DELETE') {
       return proxyCall('n8n_delete_tag', () => client.deleteTag(tagMatch[1]));
-    }
-
-    // --- Variables ---
-    if (n8nPath === '/variables' && method === 'GET') {
-      return proxyCall('n8n_list_variables', () => client.listVariables());
-    }
-    if (n8nPath === '/variables' && method === 'POST') {
-      const body = await request.json() as any;
-      return proxyCall('n8n_create_variable', () => client.createVariable(body.key, body.value));
-    }
-    const varMatch = n8nPath.match(/^\/variables\/([^/]+)$/);
-    if (varMatch && method === 'PUT') {
-      const body = await request.json() as any;
-      return proxyCall('n8n_update_variable', () => client.updateVariable(varMatch[1], body.key, body.value));
-    }
-    if (varMatch && method === 'DELETE') {
-      return proxyCall('n8n_delete_variable', () => client.deleteVariable(varMatch[1]));
     }
 
     // --- Users ---

@@ -20,7 +20,6 @@ import WorkflowList from './pages/n8n/WorkflowList';
 import ExecutionList from './pages/n8n/ExecutionList';
 import CredentialList from './pages/n8n/CredentialList';
 import TagList from './pages/n8n/TagList';
-import VariableList from './pages/n8n/VariableList';
 import N8nUserList from './pages/n8n/N8nUserList';
 import { ConnectionProvider } from './contexts/ConnectionContext';
 import { Loader2 } from 'lucide-react';
@@ -133,7 +132,6 @@ function AppRoutes() {
       <Route path="/n8n/executions" element={<ProtectedRoute><ExecutionList /></ProtectedRoute>} />
       <Route path="/n8n/credentials" element={<ProtectedRoute><CredentialList /></ProtectedRoute>} />
       <Route path="/n8n/tags" element={<ProtectedRoute><TagList /></ProtectedRoute>} />
-      <Route path="/n8n/variables" element={<ProtectedRoute><VariableList /></ProtectedRoute>} />
       <Route path="/n8n/users" element={<ProtectedRoute><N8nUserList /></ProtectedRoute>} />
 
       {/* Landing page */}

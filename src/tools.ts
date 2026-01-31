@@ -275,57 +275,6 @@ export const TOOLS = [
     },
   },
 
-  // ========== Variable Tools (4) ==========
-  {
-    name: 'n8n_list_variables',
-    description: 'Retrieve all environment variables accessible in workflows via $vars. Returns key, value, and type. Use this to manage configuration across multiple workflows without hardcoding values.',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-  {
-    name: 'n8n_create_variable',
-    description: 'Store global configuration value accessible in all workflows. Use for API URLs, default values, or environment-specific settings. Variables can be strings, numbers, booleans, or JSON objects.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        key: { type: 'string', description: 'Variable name in UPPER_SNAKE_CASE (e.g., API_BASE_URL)' },
-        value: { type: 'string', description: 'Variable value (will be parsed according to type)' },
-        type: {
-          type: 'string',
-          enum: ['string', 'boolean', 'number', 'json'],
-          description: 'Value type for parsing (default: string)',
-        },
-      },
-      required: ['key', 'value'],
-    },
-  },
-  {
-    name: 'n8n_update_variable',
-    description: 'Change variable value or key. All workflows using this variable will immediately use the new value. Use this to switch between dev/staging/prod configs without editing workflows.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        id: { type: 'string', description: 'Variable ID to update' },
-        key: { type: 'string', description: 'Updated variable name (optional)' },
-        value: { type: 'string', description: 'Updated variable value (optional)' },
-      },
-      required: ['id', 'key', 'value'],
-    },
-  },
-  {
-    name: 'n8n_delete_variable',
-    description: 'Remove environment variable. Workflows referencing this variable will throw errors on next execution. Ensure no workflows depend on this variable before deleting.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        id: { type: 'string', description: 'Variable ID to permanently delete' },
-      },
-      required: ['id'],
-    },
-  },
-
   // ========== User Tools (4) - Requires owner permissions ==========
   {
     name: 'n8n_list_users',

@@ -69,13 +69,6 @@ export function createTag(name: string) { return n8nRequest('/api/n8n/tags', { m
 export function updateTag(id: string, name: string) { return n8nRequest(`/api/n8n/tags/${id}`, { method: 'PUT', body: JSON.stringify({ name }) }); }
 export function deleteTag(id: string) { return n8nRequest(`/api/n8n/tags/${id}`, { method: 'DELETE' }); }
 
-// ============================================
-// Variables
-// ============================================
-export function listVariables() { return n8nRequest('/api/n8n/variables'); }
-export function createVariable(key: string, value: string) { return n8nRequest('/api/n8n/variables', { method: 'POST', body: JSON.stringify({ key, value }) }); }
-export function updateVariable(id: string, key: string, value: string) { return n8nRequest(`/api/n8n/variables/${id}`, { method: 'PUT', body: JSON.stringify({ key, value }) }); }
-export function deleteVariable(id: string) { return n8nRequest(`/api/n8n/variables/${id}`, { method: 'DELETE' }); }
 
 // ============================================
 // Users

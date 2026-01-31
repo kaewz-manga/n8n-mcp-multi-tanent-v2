@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
-import { getConnections, type Connection } from '../lib/api';
+import { getConnections, isAuthenticated, type Connection } from '../lib/api';
+import { useAuth } from './AuthContext';
 
 interface ConnectionContextType {
   connections: Connection[];
@@ -15,6 +16,7 @@ const ConnectionContext = createContext<ConnectionContextType | undefined>(undef
 const STORAGE_KEY = 'n8n_active_connection';
 
 export function ConnectionProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const [connections, setConnections] = useState<Connection[]>([]);
   const [activeConnectionId, setActiveId] = useState<string | null>(
     localStorage.getItem(STORAGE_KEY)
@@ -22,6 +24,11 @@ export function ConnectionProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const refreshConnections = useCallback(async () => {
+    if (!isAuthenticated()) {
+      setConnections([]);
+      setLoading(false);
+      return;
+    }
     try {
       const res = await getConnections();
       if (res.success && res.data) {
@@ -35,15 +42,25 @@ export function ConnectionProvider({ children }: { children: ReactNode }) {
           localStorage.setItem(STORAGE_KEY, id);
           setActiveId(id);
         }
+      } else {
+        setConnections([]);
       }
     } catch {
-      // ignore
+      setConnections([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { refreshConnections(); }, [refreshConnections]);
+  // Only fetch when user changes (login/logout)
+  useEffect(() => {
+    if (user) {
+      refreshConnections();
+    } else {
+      setConnections([]);
+      setLoading(false);
+    }
+  }, [user]);
 
   const setActiveConnectionId = (id: string) => {
     localStorage.setItem(STORAGE_KEY, id);

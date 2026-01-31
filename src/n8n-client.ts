@@ -169,30 +169,6 @@ export class N8nClient {
     return this.request(`/api/v1/tags/${id}`, { method: 'DELETE' });
   }
 
-  // Variable Methods
-  async listVariables() {
-    return this.request('/api/v1/variables', { method: 'GET' });
-  }
-
-  async createVariable(key: string, value: string, type?: string) {
-    // Note: 'type' parameter is read-only in some n8n versions, only send key and value
-    return this.request('/api/v1/variables', {
-      method: 'POST',
-      body: JSON.stringify({ key, value }),
-    });
-  }
-
-  async updateVariable(id: string, key: string, value: string) {
-    return this.request(`/api/v1/variables/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify({ key, value }),
-    });
-  }
-
-  async deleteVariable(id: string) {
-    return this.request(`/api/v1/variables/${id}`, { method: 'DELETE' });
-  }
-
   // User Methods (requires owner permissions)
   async listUsers() {
     return this.request('/api/v1/users', { method: 'GET' });

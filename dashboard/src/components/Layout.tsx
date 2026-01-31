@@ -17,7 +17,7 @@ import {
   PlayCircle,
   Key,
   Tag,
-  Variable,
+
   Users,
   ChevronDown,
   Server,
@@ -39,7 +39,6 @@ const n8nNavigation = [
   { name: 'Executions', href: '/n8n/executions', icon: PlayCircle },
   { name: 'Credentials', href: '/n8n/credentials', icon: Key },
   { name: 'Tags', href: '/n8n/tags', icon: Tag },
-  { name: 'Variables', href: '/n8n/variables', icon: Variable },
   { name: 'Users', href: '/n8n/users', icon: Users },
 ];
 

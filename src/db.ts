@@ -6,6 +6,8 @@
 import {
   User,
   N8nConnection,
+  AiConnection,
+  BotConnection,
   ApiKey,
   UsageLog,
   UsageMonthly,
@@ -557,6 +559,164 @@ export async function getErrorTrend(
     "SELECT DATE(created_at) as date, COUNT(*) as count FROM usage_logs WHERE status = 'error' AND created_at >= ? GROUP BY DATE(created_at) ORDER BY date"
   ).bind(since).all();
   return (result.results || []) as any[];
+}
+
+// ============================================
+// AI Connection Operations
+// ============================================
+
+export async function createAiConnection(
+  db: D1Database,
+  userId: string,
+  name: string,
+  providerUrl: string,
+  apiKeyEncrypted: string,
+  modelName: string
+): Promise<AiConnection> {
+  const id = generateUUID();
+  const now = new Date().toISOString();
+
+  await db
+    .prepare(
+      `INSERT INTO ai_connections (id, user_id, name, provider_url, api_key_encrypted, model_name, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)`
+    )
+    .bind(id, userId, name, providerUrl, apiKeyEncrypted, modelName, now, now)
+    .run();
+
+  return {
+    id,
+    user_id: userId,
+    name,
+    provider_url: providerUrl,
+    api_key_encrypted: apiKeyEncrypted,
+    model_name: modelName,
+    is_default: 0,
+    status: 'active',
+    created_at: now,
+    updated_at: now,
+  };
+}
+
+export async function getAiConnectionsByUserId(
+  db: D1Database,
+  userId: string
+): Promise<AiConnection[]> {
+  const result = await db
+    .prepare('SELECT * FROM ai_connections WHERE user_id = ? AND status = ?')
+    .bind(userId, 'active')
+    .all<AiConnection>();
+  return result.results || [];
+}
+
+export async function getAiConnectionById(
+  db: D1Database,
+  id: string
+): Promise<AiConnection | null> {
+  return db
+    .prepare('SELECT * FROM ai_connections WHERE id = ?')
+    .bind(id)
+    .first<AiConnection>();
+}
+
+export async function deleteAiConnection(
+  db: D1Database,
+  id: string
+): Promise<void> {
+  await db.prepare('DELETE FROM ai_connections WHERE id = ?').bind(id).run();
+}
+
+// ============================================
+// Bot Connection Operations
+// ============================================
+
+export async function createBotConnection(
+  db: D1Database,
+  userId: string,
+  platform: string,
+  name: string,
+  botTokenEncrypted: string,
+  channelSecretEncrypted: string | null,
+  aiConnectionId: string,
+  mcpApiKeyEncrypted: string
+): Promise<BotConnection> {
+  const id = generateUUID();
+  const now = new Date().toISOString();
+
+  await db
+    .prepare(
+      `INSERT INTO bot_connections (id, user_id, platform, name, bot_token_encrypted, channel_secret_encrypted, ai_connection_id, mcp_api_key_encrypted, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`
+    )
+    .bind(id, userId, platform, name, botTokenEncrypted, channelSecretEncrypted, aiConnectionId, mcpApiKeyEncrypted, now, now)
+    .run();
+
+  return {
+    id,
+    user_id: userId,
+    platform: platform as 'telegram' | 'line',
+    name,
+    bot_token_encrypted: botTokenEncrypted,
+    channel_secret_encrypted: channelSecretEncrypted,
+    ai_connection_id: aiConnectionId,
+    mcp_api_key_encrypted: mcpApiKeyEncrypted,
+    webhook_active: 0,
+    webhook_url: null,
+    status: 'active',
+    created_at: now,
+    updated_at: now,
+  };
+}
+
+export async function getBotConnectionsByUserId(
+  db: D1Database,
+  userId: string
+): Promise<BotConnection[]> {
+  const result = await db
+    .prepare('SELECT * FROM bot_connections WHERE user_id = ? AND status = ?')
+    .bind(userId, 'active')
+    .all<BotConnection>();
+  return result.results || [];
+}
+
+export async function getBotConnectionById(
+  db: D1Database,
+  id: string
+): Promise<BotConnection | null> {
+  return db
+    .prepare('SELECT * FROM bot_connections WHERE id = ?')
+    .bind(id)
+    .first<BotConnection>();
+}
+
+export async function getBotConnectionByUserAndPlatform(
+  db: D1Database,
+  userId: string,
+  platform: string
+): Promise<BotConnection | null> {
+  return db
+    .prepare('SELECT * FROM bot_connections WHERE user_id = ? AND platform = ? AND status = ?')
+    .bind(userId, platform, 'active')
+    .first<BotConnection>();
+}
+
+export async function updateBotConnectionWebhook(
+  db: D1Database,
+  id: string,
+  webhookActive: boolean,
+  webhookUrl: string | null
+): Promise<void> {
+  await db
+    .prepare('UPDATE bot_connections SET webhook_active = ?, webhook_url = ?, updated_at = ? WHERE id = ?')
+    .bind(webhookActive ? 1 : 0, webhookUrl, new Date().toISOString(), id)
+    .run();
+}
+
+export async function deleteBotConnection(
+  db: D1Database,
+  id: string
+): Promise<void> {
+  await db.prepare('DELETE FROM bot_connections WHERE id = ?').bind(id).run();
 }
 
 // ============================================

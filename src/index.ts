@@ -49,8 +49,18 @@ import {
   getRecentErrors,
   getPlanDistribution,
   getErrorTrend,
+  createAiConnection,
+  getAiConnectionsByUserId,
+  getAiConnectionById,
+  deleteAiConnection,
+  createBotConnection,
+  getBotConnectionsByUserId,
+  getBotConnectionById,
+  getBotConnectionByUserAndPlatform,
+  updateBotConnectionWebhook,
+  deleteBotConnection,
 } from './db';
-import { hashPassword, verifyPassword, decrypt } from './crypto-utils';
+import { hashPassword, verifyPassword, decrypt, encrypt } from './crypto-utils';
 import { generateApiKey, hashApiKey } from './crypto-utils';
 import { createApiKey as createApiKeyDb } from './db';
 import { createCheckoutSession, createBillingPortalSession, handleStripeWebhook } from './stripe';
@@ -416,6 +426,79 @@ async function handleManagementApi(
     });
   }
 
+  // Agent config endpoint (HMAC auth - Vercel agent calls this)
+  if (path === '/api/agent/config' && method === 'POST') {
+    if (!env.AGENT_SECRET) {
+      return apiResponse({ success: false, error: { code: 'NOT_CONFIGURED', message: 'Agent not configured' } }, 503);
+    }
+    const body = await request.json() as any;
+    const { user_id, ai_connection_id, signature } = body;
+    if (!user_id || !ai_connection_id || !signature) {
+      return apiResponse({ success: false, error: { code: 'MISSING_FIELDS', message: 'user_id, ai_connection_id, and signature required' } }, 400);
+    }
+    // Verify HMAC-SHA256 signature
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey('raw', encoder.encode(env.AGENT_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+    const data = encoder.encode(`${user_id}:${ai_connection_id}`);
+    const sig = Uint8Array.from(atob(signature), c => c.charCodeAt(0));
+    const valid = await crypto.subtle.verify('HMAC', key, sig, data);
+    if (!valid) {
+      return apiResponse({ success: false, error: { code: 'INVALID_SIGNATURE', message: 'Invalid signature' } }, 403);
+    }
+    const conn = await getAiConnectionById(env.DB, ai_connection_id);
+    if (!conn || conn.user_id !== user_id || conn.status !== 'active') {
+      return apiResponse({ success: false, error: { code: 'NOT_FOUND', message: 'AI connection not found' } }, 404);
+    }
+    const apiKey = await decrypt(conn.api_key_encrypted, env.ENCRYPTION_KEY);
+    return apiResponse({
+      success: true,
+      data: { provider_url: conn.provider_url, api_key: apiKey, model_name: conn.model_name },
+    });
+  }
+
+  // Agent bot-config endpoint (HMAC auth - Vercel agent calls this for bot tokens)
+  if (path === '/api/agent/bot-config' && method === 'POST') {
+    if (!env.AGENT_SECRET) {
+      return apiResponse({ success: false, error: { code: 'NOT_CONFIGURED', message: 'Agent not configured' } }, 503);
+    }
+    const body = await request.json() as any;
+    const { user_id, platform, signature } = body;
+    if (!user_id || !platform || !signature) {
+      return apiResponse({ success: false, error: { code: 'MISSING_FIELDS', message: 'user_id, platform, and signature required' } }, 400);
+    }
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey('raw', encoder.encode(env.AGENT_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+    const data = encoder.encode(`bot:${user_id}:${platform}`);
+    const sig = Uint8Array.from(atob(signature), c => c.charCodeAt(0));
+    const valid = await crypto.subtle.verify('HMAC', key, sig, data);
+    if (!valid) {
+      return apiResponse({ success: false, error: { code: 'INVALID_SIGNATURE', message: 'Invalid signature' } }, 403);
+    }
+    const botConn = await getBotConnectionByUserAndPlatform(env.DB, user_id, platform);
+    if (!botConn || botConn.status !== 'active') {
+      return apiResponse({ success: false, error: { code: 'NOT_FOUND', message: 'Bot connection not found' } }, 404);
+    }
+    const botToken = await decrypt(botConn.bot_token_encrypted, env.ENCRYPTION_KEY);
+    const channelSecret = botConn.channel_secret_encrypted
+      ? await decrypt(botConn.channel_secret_encrypted, env.ENCRYPTION_KEY)
+      : null;
+    const mcpApiKey = await decrypt(botConn.mcp_api_key_encrypted, env.ENCRYPTION_KEY);
+    const aiConn = await getAiConnectionById(env.DB, botConn.ai_connection_id);
+    if (!aiConn || aiConn.status !== 'active') {
+      return apiResponse({ success: false, error: { code: 'AI_NOT_FOUND', message: 'Linked AI connection not found' } }, 404);
+    }
+    const aiApiKey = await decrypt(aiConn.api_key_encrypted, env.ENCRYPTION_KEY);
+    return apiResponse({
+      success: true,
+      data: {
+        bot_token: botToken,
+        channel_secret: channelSecret,
+        ai_config: { provider_url: aiConn.provider_url, api_key: aiApiKey, model_name: aiConn.model_name },
+        mcp_api_key: mcpApiKey,
+      },
+    });
+  }
+
   // All other endpoints require JWT auth
   const authUser = await verifyAuthToken(request, env.JWT_SECRET);
   if (!authUser) {
@@ -565,6 +648,177 @@ async function handleManagementApi(
     }
 
     return apiResponse({ success: false, error: { code: 'NOT_FOUND', message: 'Admin endpoint not found' } }, 404);
+  }
+
+  // ============================================
+  // AI Connection Endpoints
+  // ============================================
+  if (path === '/api/ai-connections' && method === 'GET') {
+    const connections = await getAiConnectionsByUserId(env.DB, authUser.userId);
+    return apiResponse({
+      success: true,
+      data: {
+        connections: connections.map(c => ({
+          id: c.id, name: c.name, provider_url: c.provider_url,
+          model_name: c.model_name, is_default: c.is_default,
+          status: c.status, created_at: c.created_at,
+        })),
+      },
+    });
+  }
+
+  if (path === '/api/ai-connections' && method === 'POST') {
+    const body = await request.json() as any;
+    const { name, provider_url, api_key, model_name } = body;
+    if (!provider_url || !api_key || !model_name) {
+      return apiResponse({ success: false, error: { code: 'MISSING_FIELDS', message: 'provider_url, api_key, and model_name are required' } }, 400);
+    }
+    const encrypted = await encrypt(api_key, env.ENCRYPTION_KEY);
+    const conn = await createAiConnection(env.DB, authUser.userId, name || 'Default AI', provider_url, encrypted, model_name);
+    return apiResponse({
+      success: true,
+      data: {
+        connection: { id: conn.id, name: conn.name, provider_url: conn.provider_url, model_name: conn.model_name, status: conn.status, created_at: conn.created_at },
+        message: 'AI connection created',
+      },
+    });
+  }
+
+  const aiConnDelete = path.match(/^\/api\/ai-connections\/([^/]+)$/);
+  if (aiConnDelete && method === 'DELETE') {
+    const conn = await getAiConnectionById(env.DB, aiConnDelete[1]);
+    if (!conn || conn.user_id !== authUser.userId) {
+      return apiResponse({ success: false, error: { code: 'NOT_FOUND', message: 'AI connection not found' } }, 404);
+    }
+    await deleteAiConnection(env.DB, aiConnDelete[1]);
+    return apiResponse({ success: true, data: { message: 'AI connection deleted' } });
+  }
+
+  const aiConnConfig = path.match(/^\/api\/ai-connections\/([^/]+)\/config$/);
+  if (aiConnConfig && method === 'GET') {
+    const conn = await getAiConnectionById(env.DB, aiConnConfig[1]);
+    if (!conn || conn.user_id !== authUser.userId) {
+      return apiResponse({ success: false, error: { code: 'NOT_FOUND', message: 'AI connection not found' } }, 404);
+    }
+    const apiKey = await decrypt(conn.api_key_encrypted, env.ENCRYPTION_KEY);
+    return apiResponse({
+      success: true,
+      data: { provider_url: conn.provider_url, api_key: apiKey, model_name: conn.model_name },
+    });
+  }
+
+  // ============================================
+  // Bot Connection Endpoints
+  // ============================================
+  if (path === '/api/bot-connections' && method === 'GET') {
+    const connections = await getBotConnectionsByUserId(env.DB, authUser.userId);
+    return apiResponse({
+      success: true,
+      data: {
+        connections: connections.map(c => ({
+          id: c.id, platform: c.platform, name: c.name,
+          ai_connection_id: c.ai_connection_id,
+          webhook_active: c.webhook_active, webhook_url: c.webhook_url,
+          status: c.status, created_at: c.created_at,
+        })),
+      },
+    });
+  }
+
+  if (path === '/api/bot-connections' && method === 'POST') {
+    const body = await request.json() as any;
+    const { platform, name, bot_token, channel_secret, ai_connection_id, mcp_api_key } = body;
+    if (!platform || !bot_token || !ai_connection_id || !mcp_api_key) {
+      return apiResponse({ success: false, error: { code: 'MISSING_FIELDS', message: 'platform, bot_token, ai_connection_id, and mcp_api_key are required' } }, 400);
+    }
+    if (platform !== 'telegram' && platform !== 'line') {
+      return apiResponse({ success: false, error: { code: 'INVALID_PLATFORM', message: 'platform must be telegram or line' } }, 400);
+    }
+    if (platform === 'line' && !channel_secret) {
+      return apiResponse({ success: false, error: { code: 'MISSING_FIELDS', message: 'channel_secret is required for LINE' } }, 400);
+    }
+    const aiConn = await getAiConnectionById(env.DB, ai_connection_id);
+    if (!aiConn || aiConn.user_id !== authUser.userId || aiConn.status !== 'active') {
+      return apiResponse({ success: false, error: { code: 'AI_NOT_FOUND', message: 'AI connection not found' } }, 404);
+    }
+    const botTokenEnc = await encrypt(bot_token, env.ENCRYPTION_KEY);
+    const channelSecretEnc = channel_secret ? await encrypt(channel_secret, env.ENCRYPTION_KEY) : null;
+    const mcpKeyEnc = await encrypt(mcp_api_key, env.ENCRYPTION_KEY);
+    const conn = await createBotConnection(env.DB, authUser.userId, platform, name || 'My Bot', botTokenEnc, channelSecretEnc, ai_connection_id, mcpKeyEnc);
+    return apiResponse({
+      success: true,
+      data: {
+        connection: { id: conn.id, platform: conn.platform, name: conn.name, status: conn.status, created_at: conn.created_at },
+        message: 'Bot connection created',
+      },
+    });
+  }
+
+  const botConnMatch = path.match(/^\/api\/bot-connections\/([^/]+)$/);
+  if (botConnMatch && method === 'DELETE') {
+    const conn = await getBotConnectionById(env.DB, botConnMatch[1]);
+    if (!conn || conn.user_id !== authUser.userId) {
+      return apiResponse({ success: false, error: { code: 'NOT_FOUND', message: 'Bot connection not found' } }, 404);
+    }
+    // Deregister webhook if active (Telegram only)
+    if (conn.webhook_active && conn.platform === 'telegram') {
+      try {
+        const botToken = await decrypt(conn.bot_token_encrypted, env.ENCRYPTION_KEY);
+        await fetch(`https://api.telegram.org/bot${botToken}/deleteWebhook`);
+      } catch { /* best effort */ }
+    }
+    await deleteBotConnection(env.DB, botConnMatch[1]);
+    return apiResponse({ success: true, data: { message: 'Bot connection deleted' } });
+  }
+
+  const botWebhookMatch = path.match(/^\/api\/bot-connections\/([^/]+)\/webhook$/);
+  if (botWebhookMatch && method === 'POST') {
+    const conn = await getBotConnectionById(env.DB, botWebhookMatch[1]);
+    if (!conn || conn.user_id !== authUser.userId) {
+      return apiResponse({ success: false, error: { code: 'NOT_FOUND', message: 'Bot connection not found' } }, 404);
+    }
+    const agentUrl = env.AGENT_URL;
+    if (!agentUrl) {
+      return apiResponse({ success: false, error: { code: 'NOT_CONFIGURED', message: 'AGENT_URL not configured' } }, 503);
+    }
+    const webhookUrl = `${agentUrl}/api/webhook/${conn.platform}/${conn.user_id}`;
+    if (conn.platform === 'telegram') {
+      const botToken = await decrypt(conn.bot_token_encrypted, env.ENCRYPTION_KEY);
+      const res = await fetch(`https://api.telegram.org/bot${botToken}/setWebhook`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: webhookUrl }),
+      });
+      const result = await res.json() as any;
+      if (!result.ok) {
+        return apiResponse({ success: false, error: { code: 'TELEGRAM_ERROR', message: result.description || 'Failed to set webhook' } }, 502);
+      }
+    }
+    await updateBotConnectionWebhook(env.DB, conn.id, true, webhookUrl);
+    return apiResponse({
+      success: true,
+      data: {
+        webhook_url: webhookUrl,
+        message: conn.platform === 'line'
+          ? 'Paste this URL in LINE Developer Console > Messaging API > Webhook URL'
+          : 'Telegram webhook registered',
+      },
+    });
+  }
+
+  if (botWebhookMatch && method === 'DELETE') {
+    const conn = await getBotConnectionById(env.DB, botWebhookMatch[1]);
+    if (!conn || conn.user_id !== authUser.userId) {
+      return apiResponse({ success: false, error: { code: 'NOT_FOUND', message: 'Bot connection not found' } }, 404);
+    }
+    if (conn.platform === 'telegram' && conn.webhook_active) {
+      try {
+        const botToken = await decrypt(conn.bot_token_encrypted, env.ENCRYPTION_KEY);
+        await fetch(`https://api.telegram.org/bot${botToken}/deleteWebhook`);
+      } catch { /* best effort */ }
+    }
+    await updateBotConnectionWebhook(env.DB, conn.id, false, null);
+    return apiResponse({ success: true, data: { message: 'Webhook deregistered' } });
   }
 
   // ============================================

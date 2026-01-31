@@ -75,6 +75,35 @@ export interface Plan {
   created_at: string;
 }
 
+export interface AiConnection {
+  id: string;
+  user_id: string;
+  name: string;
+  provider_url: string;
+  api_key_encrypted: string;
+  model_name: string;
+  is_default: number;
+  status: 'active' | 'inactive';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BotConnection {
+  id: string;
+  user_id: string;
+  platform: 'telegram' | 'line';
+  name: string;
+  bot_token_encrypted: string;
+  channel_secret_encrypted: string | null;
+  ai_connection_id: string;
+  mcp_api_key_encrypted: string;
+  webhook_active: number;
+  webhook_url: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // ============================================
 // API Request/Response Types
 // ============================================
@@ -183,6 +212,10 @@ export interface Env {
   STRIPE_PRICE_STARTER?: string;
   STRIPE_PRICE_PRO?: string;
   STRIPE_PRICE_ENTERPRISE?: string;
+
+  // Agent Secret (HMAC auth between Vercel agent and Worker)
+  AGENT_SECRET?: string;
+  AGENT_URL?: string;
 
   // Optional
   ENVIRONMENT?: 'development' | 'staging' | 'production';

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { listN8nUsers, deleteN8nUser, updateN8nUserRole } from '../../lib/n8n-api';
+import { listN8nUsers, deleteN8nUser } from '../../lib/n8n-api';
 import { useConnection } from '../../contexts/ConnectionContext';
 import StatusBadge from '../../components/n8n/StatusBadge';
 import ConfirmDialog from '../../components/n8n/ConfirmDialog';
@@ -11,7 +11,6 @@ export default function N8nUserList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
-  const [updatingRole, setUpdatingRole] = useState<string | null>(null);
 
   async function fetch() {
     setLoading(true);
@@ -27,14 +26,6 @@ export default function N8nUserList() {
   }
 
   useEffect(() => { if (activeConnection) fetch(); }, [activeConnection?.id]);
-
-  async function handleRoleChange(userId: string, newRole: string) {
-    setUpdatingRole(userId);
-    const res = await updateN8nUserRole(userId, newRole);
-    setUpdatingRole(null);
-    if (res.success) fetch();
-    else alert(res.error?.message || 'Failed to update role');
-  }
 
   async function handleDelete() {
     if (!deleteTarget) return;
@@ -91,22 +82,14 @@ export default function N8nUserList() {
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">{user.email || '-'}</td>
                   <td className="px-4 py-3">
-                    {updatingRole === user.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                    ) : (
-                      <select
-                        value={user.role || user.globalRole?.name || ''}
-                        onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                        className="text-xs px-2 py-1 border border-gray-300 rounded bg-white"
-                      >
-                        <option value="global:owner">Owner</option>
-                        <option value="global:admin">Admin</option>
-                        <option value="global:member">Member</option>
-                      </select>
-                    )}
+                    <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
+                      user.role === 'global:owner' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {user.role === 'global:owner' ? 'Owner' : 'Member'}
+                    </span>
                   </td>
                   <td className="px-4 py-3">
-                    <StatusBadge status={user.disabled ? 'inactive' : 'active'} />
+                    <StatusBadge status={user.isPending ? 'pending' : user.disabled ? 'inactive' : 'active'} />
                   </td>
                   <td className="px-4 py-3">
                     <button onClick={() => setDeleteTarget(user)} className="p-1.5 text-red-600 hover:bg-red-50 rounded" title="Delete user">

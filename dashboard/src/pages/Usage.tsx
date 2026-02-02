@@ -228,103 +228,96 @@ export default function Usage() {
         <h2 className="text-lg font-semibold text-gray-900 mb-4">
           Available Plans
         </h2>
-        <div className="relative">
-          <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 ${!isAdmin ? 'blur-sm select-none pointer-events-none' : ''}`}>
-            {plans.map((plan) => {
-              const isCurrent = plan.id === user?.plan;
-              const isUpgrade =
-                (plans.findIndex((p) => p.id === plan.id) >
-                  plans.findIndex((p) => p.id === user?.plan)) &&
-                !isCurrent;
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {plans.map((plan) => {
+            const isCurrent = plan.id === user?.plan;
+            const isFree = plan.price_monthly === 0;
+            const isBlurred = !isAdmin && !isFree;
+            const isUpgrade =
+              (plans.findIndex((p) => p.id === plan.id) >
+                plans.findIndex((p) => p.id === user?.plan)) &&
+              !isCurrent;
 
-              return (
-                <div
-                  key={plan.id}
-                  className={`card relative ${
-                    isCurrent ? 'border-blue-500 border-2' : ''
-                  }`}
-                >
-                  {isCurrent && (
-                    <span className="absolute -top-3 left-4 bg-blue-500 text-white text-xs px-2 py-1 rounded-full">
-                      Current
-                    </span>
-                  )}
+            return (
+              <div
+                key={plan.id}
+                className={`card relative ${
+                  isCurrent ? 'border-blue-500 border-2' : ''
+                } ${isBlurred ? 'blur-sm select-none pointer-events-none' : ''}`}
+              >
+                {isCurrent && (
+                  <span className="absolute -top-3 left-4 bg-blue-500 text-white text-xs px-2 py-1 rounded-full">
+                    Current
+                  </span>
+                )}
 
-                  <div className="flex items-center gap-2 mb-2">
-                    <Zap
-                      className={`h-5 w-5 ${
-                        isCurrent ? 'text-blue-600' : 'text-gray-400'
-                      }`}
-                    />
-                    <h3 className="font-semibold text-gray-900">{plan.name}</h3>
-                  </div>
-
-                  <p className="text-3xl font-bold text-gray-900 mb-4">
-                    ${plan.price_monthly}
-                    <span className="text-sm font-normal text-gray-500">/mo</span>
-                  </p>
-
-                  <ul className="space-y-2 text-sm text-gray-600 mb-6">
-                    <li className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
-                      {plan.monthly_request_limit.toLocaleString()} requests/month
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
-                      {plan.max_connections === -1
-                        ? 'Unlimited'
-                        : plan.max_connections}{' '}
-                      connections
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
-                      {plan.features?.support || 'Community'} support
-                    </li>
-                  </ul>
-
-                  {isCurrent ? (
-                    <button disabled className="btn-secondary w-full opacity-50">
-                      Current Plan
-                    </button>
-                  ) : isUpgrade ? (
-                    <button
-                      className="btn-primary w-full"
-                      onClick={() => handleChangePlan(plan.id)}
-                      disabled={checkoutLoading === plan.id}
-                    >
-                      {checkoutLoading === plan.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <>
-                          Upgrade
-                          <ArrowUpRight className="h-4 w-4 ml-1" />
-                        </>
-                      )}
-                    </button>
-                  ) : (
-                    <button
-                      className="btn-secondary w-full"
-                      onClick={() => handleChangePlan(plan.id)}
-                      disabled={checkoutLoading === plan.id}
-                    >
-                      {checkoutLoading === plan.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        'Downgrade'
-                      )}
-                    </button>
-                  )}
+                <div className="flex items-center gap-2 mb-2">
+                  <Zap
+                    className={`h-5 w-5 ${
+                      isCurrent ? 'text-blue-600' : 'text-gray-400'
+                    }`}
+                  />
+                  <h3 className="font-semibold text-gray-900">{plan.name}</h3>
                 </div>
-              );
-            })}
-          </div>
-          {!isAdmin && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="bg-yellow-100 text-yellow-800 text-lg font-semibold px-6 py-3 rounded-full shadow-lg">
-                Coming Soon
-              </span>
-            </div>
-          )}
+
+                <p className="text-3xl font-bold text-gray-900 mb-4">
+                  {!isAdmin && !isFree ? '$xx.xx' : `$${plan.price_monthly}`}
+                  <span className="text-sm font-normal text-gray-500">/mo</span>
+                </p>
+
+                <ul className="space-y-2 text-sm text-gray-600 mb-6">
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                    {plan.monthly_request_limit.toLocaleString()} requests/month
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                    {plan.max_connections === -1
+                      ? 'Unlimited'
+                      : plan.max_connections}{' '}
+                    connections
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                    {plan.features?.support || 'Community'} support
+                  </li>
+                </ul>
+
+                {isCurrent ? (
+                  <button disabled className="btn-secondary w-full opacity-50">
+                    Current Plan
+                  </button>
+                ) : isUpgrade ? (
+                  <button
+                    className="btn-primary w-full"
+                    onClick={() => handleChangePlan(plan.id)}
+                    disabled={checkoutLoading === plan.id}
+                  >
+                    {checkoutLoading === plan.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        Upgrade
+                        <ArrowUpRight className="h-4 w-4 ml-1" />
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    className="btn-secondary w-full"
+                    onClick={() => handleChangePlan(plan.id)}
+                    disabled={checkoutLoading === plan.id}
+                  >
+                    {checkoutLoading === plan.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      'Downgrade'
+                    )}
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

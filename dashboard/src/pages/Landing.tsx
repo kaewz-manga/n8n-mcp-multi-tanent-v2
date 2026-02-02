@@ -206,17 +206,10 @@ Would you like me to activate the Data Sync Pipeline?`}</code>
             </p>
           </div>
 
-          <div className="relative">
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 blur-sm select-none pointer-events-none">
-              {plans.map((plan) => (
-                <PricingCard key={plan.id} plan={plan} />
-              ))}
-            </div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="bg-yellow-100 text-yellow-800 text-lg font-semibold px-6 py-3 rounded-full shadow-lg">
-                Coming Soon
-              </span>
-            </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {plans.map((plan) => (
+              <PricingCard key={plan.id} plan={plan} />
+            ))}
           </div>
         </div>
       </section>
@@ -297,13 +290,14 @@ function FeatureCard({
 // Pricing Card Component
 function PricingCard({ plan }: { plan: Plan }) {
   const isPopular = plan.id === 'pro';
+  const isFree = plan.price_monthly === 0;
   const features = plan.features as Record<string, any>;
 
   return (
     <div
       className={`bg-white rounded-xl border-2 p-6 relative ${
         isPopular ? 'border-blue-600 shadow-lg' : 'border-gray-200'
-      }`}
+      } ${!isFree ? 'blur-sm select-none pointer-events-none' : ''}`}
     >
       {isPopular && (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs font-semibold px-3 py-1 rounded-full">
@@ -314,7 +308,7 @@ function PricingCard({ plan }: { plan: Plan }) {
       <h3 className="text-lg font-semibold text-gray-900 mb-1">{plan.name}</h3>
       <div className="mb-4">
         <span className="text-3xl font-bold text-gray-900">
-          ${plan.price_monthly}
+          {isFree ? `$${plan.price_monthly}` : '$xx.xx'}
         </span>
         <span className="text-gray-500">/month</span>
       </div>
@@ -348,9 +342,18 @@ function PricingCard({ plan }: { plan: Plan }) {
         )}
       </ul>
 
-      <div className="block w-full text-center py-2 rounded-lg font-medium bg-gray-100 text-gray-400">
-        Coming Soon
-      </div>
+      {isFree ? (
+        <Link
+          to="/register"
+          className="block w-full text-center py-2 rounded-lg font-medium bg-gray-100 text-gray-900 hover:bg-gray-200 transition-colors"
+        >
+          Start Free
+        </Link>
+      ) : (
+        <div className="block w-full text-center py-2 rounded-lg font-medium bg-gray-100 text-gray-400">
+          Coming Soon
+        </div>
+      )}
     </div>
   );
 }

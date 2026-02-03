@@ -98,18 +98,18 @@ export default function Usage() {
       </div>
 
       {/* Current Plan Card */}
-      <div className="card bg-gradient-to-br from-n2f-accent to-amber-600 text-gray-900">
+      <div className="card">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-n2f-text-secondary text-sm">Current Plan</p>
-            <h2 className="text-3xl font-bold capitalize mt-1">
+            <h2 className="text-3xl font-bold capitalize mt-1 text-n2f-text">
               {currentPlan?.name || user?.plan}
             </h2>
             <p className="text-n2f-text-secondary mt-2">
               {minuteLimit === -1 ? 'Unlimited' : minuteLimit} req/min
               {' • '}
               {dailyLimit === -1 ? (
-                <span className="font-semibold">Unlimited/day</span>
+                <span className="font-semibold text-emerald-400">Unlimited/day</span>
               ) : (
                 `${dailyLimit.toLocaleString()} req/day`
               )}
@@ -119,9 +119,9 @@ export default function Usage() {
           </div>
           <div className="text-right">
             {currentPlan?.price_monthly === -1 ? (
-              <p className="text-2xl font-bold">Custom</p>
+              <p className="text-2xl font-bold text-n2f-text">Custom</p>
             ) : (
-              <p className="text-4xl font-bold">
+              <p className="text-4xl font-bold text-n2f-accent">
                 ${currentPlan?.price_monthly || 0}
                 <span className="text-lg font-normal text-n2f-text-secondary">/mo</span>
               </p>

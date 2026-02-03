@@ -82,7 +82,7 @@ export default function AdminUsers() {
               placeholder="Search email..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-3 py-2 border border-n2f-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="pl-9 pr-3 py-2 border border-n2f-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-n2f-accent"
             />
           </div>
           <button type="submit" className="btn-primary text-sm px-3 py-2">Search</button>
@@ -112,7 +112,7 @@ export default function AdminUsers() {
 
       {loading ? (
         <div className="flex justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-red-600" />
+          <Loader2 className="h-6 w-6 animate-spin text-n2f-accent" />
         </div>
       ) : (
         <>

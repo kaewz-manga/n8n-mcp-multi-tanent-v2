@@ -62,3 +62,31 @@ When updating docs:
 1. Show what was added/changed
 2. Explain why the update matters
 3. Link to relevant code files
+
+---
+
+## MCP Tools Available
+
+| MCP | Tool | When to Use |
+|-----|------|-------------|
+| **cloudflare-docs** | Search docs | Get accurate CF API references |
+| **memory** | Add observations | Log documentation updates |
+
+### Documentation Workflow with MCP
+
+1. **Research**: Use `cloudflare-docs` to get accurate terminology and patterns
+2. **Update**: Edit relevant documentation files
+3. **Record**: Use `memory` to log what was updated and why
+
+### Example MCP Usage
+
+```
+# Look up D1 best practices
+Tool: cloudflare-docs → search
+Query: "D1 prepared statements best practices"
+
+# Record doc update
+Tool: mcp__memory__add_observations
+Entity: docs-update-YYYY-MM-DD
+Observations: "Updated CLAUDE.md with MCP integration section"
+```

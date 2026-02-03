@@ -49,6 +49,32 @@ npm test -- --watch
    Error: ...
 ```
 
+## MCP Tools Available
+
+| MCP | Tool | When to Use |
+|-----|------|-------------|
+| **memory** | Add observations | Record test results across sessions |
+
+### Test Workflow with MCP
+
+After running tests:
+1. Record results in Memory MCP for tracking
+2. If failures, create incident entity
+
+### Example MCP Usage
+
+```
+# Record test results
+Tool: mcp__memory__add_observations
+Entity: test-run-YYYY-MM-DD
+Observations:
+  - "auth.test.ts: 15 passed, 0 failed"
+  - "mcp.test.ts: 8 passed, 1 failed"
+  - "Failed: should handle rate limit"
+```
+
+---
+
 ## Notes
 
 - Report only failing tests

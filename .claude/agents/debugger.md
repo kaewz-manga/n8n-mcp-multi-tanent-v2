@@ -55,6 +55,40 @@ npx wrangler d1 execute n8n-management-mcp-db --remote --command "SELECT ..."
 cd dashboard && npm run dev
 ```
 
+## MCP Tools Available
+
+When debugging, use these MCP servers:
+
+| MCP | Tool | When to Use |
+|-----|------|-------------|
+| **cloudflare-observability** | Get logs, errors | View Worker request logs, find errors |
+| **memory** | Search, add observations | Check past incidents, record findings |
+
+### Debug Workflow with MCP
+
+1. **Get error logs**: Use `cloudflare-observability` to pull recent errors
+2. **Check history**: Use `memory` to search for similar past incidents
+3. **Investigate**: Read relevant source files
+4. **Fix**: Implement minimal fix
+5. **Record**: Use `memory` to document the incident and fix
+
+### Example MCP Usage
+
+```
+# Get Worker errors from last hour
+Tool: cloudflare-observability → get_errors
+
+# Search for similar past issues
+Tool: mcp__memory__search_nodes
+Query: "auth error" or "401"
+
+# Record incident after fix
+Tool: mcp__memory__create_entities
+Entity: incident-YYYY-MM-DD-description
+```
+
+---
+
 ## Output Format
 
 When reporting findings:

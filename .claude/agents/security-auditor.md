@@ -75,3 +75,27 @@ crypto.subtle.digest('SHA-256', password)
 // GOOD: PBKDF2
 await pbkdf2(password, salt, 100000)
 ```
+
+---
+
+## MCP Tools Available
+
+| MCP | Tool | When to Use |
+|-----|------|-------------|
+| **github** | Search code | Find exposed secrets, security patterns |
+| **memory** | Create entities | Record security findings |
+
+### Security Audit with MCP
+
+1. **Search for secrets**: Use `github` MCP to scan for exposed credentials
+   ```
+   Query: "sk_live" OR "n2f_" OR "ENCRYPTION_KEY" in:file
+   ```
+
+2. **Record findings**: Use `memory` MCP to log security issues
+   ```
+   Entity: security-finding-YYYY-MM-DD
+   Observations: Issue, severity, remediation status
+   ```
+
+3. **Track remediation**: Update memory entity when issues are fixed

@@ -67,6 +67,21 @@ Status: XXX
 Response: { ... }
 ```
 
+## MCP Tools Available
+
+| MCP | Tool | When to Use |
+|-----|------|-------------|
+| **cloudflare-observability** | Get logs | Verify requests were logged correctly |
+
+### Post-Test Verification
+
+After testing endpoints:
+1. Use `cloudflare-observability` to verify request was logged
+2. Check response times in logs
+3. Identify error patterns
+
+---
+
 ## Notes
 
 - Never test with real user credentials

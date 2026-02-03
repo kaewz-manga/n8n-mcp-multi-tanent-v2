@@ -1,21 +1,21 @@
-# CLAUDE.md — n8n-management-mcp
+# n8n-management-mcp
 
-> Technical guide for AI assistants working on this Cloudflare Worker project.
+> Cloudflare Worker backend for n8n MCP SaaS platform.
 
 ---
 
-## What This Project Is
+## Quick Links
 
-Cloudflare Worker that serves as the **backend** for the n8n MCP SaaS platform. It provides:
-
-1. **MCP Server** — JSON-RPC 2.0 endpoint (`POST /mcp`) with 31 n8n tools
-2. **Management API** — REST endpoints for users, connections, API keys, billing
-3. **Auth** — Email/password, OAuth (GitHub/Google), JWT, HMAC-SHA256, SaaS API keys
-4. **Admin API** — User management, analytics, revenue tracking
-
-Deployed on Cloudflare Workers at `https://n8n-management-mcp.node2flow.net`.
-
-There is also a **Dashboard** (React 19 SPA) in `dashboard/` deployed on Cloudflare Pages at `https://n8n-management-dashboard.node2flow.net`.
+| Area | Guide | Key Info |
+|------|-------|----------|
+| **Worker Code** | [`src/CLAUDE.md`](src/CLAUDE.md) | Routes, auth, D1, crypto |
+| **Dashboard** | [`dashboard/CLAUDE.md`](dashboard/CLAUDE.md) | React, theme, routes |
+| **React Patterns** | [`dashboard/src/CLAUDE.md`](dashboard/src/CLAUDE.md) | Components, hooks |
+| **Pages** | [`dashboard/src/pages/CLAUDE.md`](dashboard/src/pages/CLAUDE.md) | Page patterns |
+| **Components** | [`dashboard/src/components/CLAUDE.md`](dashboard/src/components/CLAUDE.md) | UI components |
+| **Contexts** | [`dashboard/src/contexts/CLAUDE.md`](dashboard/src/contexts/CLAUDE.md) | Auth, Sudo, Connection |
+| **Migrations** | [`migrations/CLAUDE.md`](migrations/CLAUDE.md) | D1 schema |
+| **Tests** | [`tests/CLAUDE.md`](tests/CLAUDE.md) | Vitest patterns |
 
 ---
 
@@ -34,375 +34,129 @@ There is also a **Dashboard** (React 19 SPA) in `dashboard/` deployed on Cloudfl
 │  n8n-management-mcp.node2flow.net                                │
 │                                                                  │
 │  /mcp              → MCP Protocol (31 tools)                     │
-│  /api/auth/*       → Register, Login, OAuth                      │
+│  /api/auth/*       → Register, Login, OAuth, TOTP                │
 │  /api/connections   → n8n instance CRUD                          │
-│  /api/ai-connections → AI provider CRUD (BYOK)                   │
-│  /api/bot-connections → Bot CRUD + webhook                       │
-│  /api/agent/*      → HMAC auth for Vercel agent                  │
 │  /api/admin/*      → Admin panel APIs                            │
 │  /api/billing/*    → Stripe checkout/portal                      │
-│  /api/plans        → Public plans list                           │
 │                                                                  │
 │  D1 Database ──── KV (Rate Limit + OAuth State)                  │
-└──────────────────────┬───────────────────────────────────────────┘
-                       │ n8n Public API
-                       ▼
-               ┌───────────────┐
-               │  n8n Instance  │
-               │  (Customer's)  │
-               └───────────────┘
+└──────────────────────────────────────────────────────────────────┘
 ```
+
+**URLs**:
+- Worker: `https://n8n-management-mcp.node2flow.net`
+- Dashboard: `https://n8n-management-dashboard.node2flow.net`
+
+---
+
+## MCP Servers
+
+Available in `.mcp.json`:
+
+| MCP | Purpose | Status |
+|-----|---------|--------|
+| **cloudflare-observability** | Worker logs, debugging | Enabled |
+| **cloudflare-workers** | D1, KV bindings | Enabled |
+| **cloudflare-docs** | CF documentation search | Enabled |
+| **memory** | Persistent knowledge | Enabled |
+| **stripe** | Billing management | Disabled |
+| **github** | Repo management | Disabled |
+| **playwright** | E2E testing | Disabled |
+| **sqlite** | Local D1 queries | Disabled |
+
+---
+
+## Slash Commands
+
+| Command | Description |
+|---------|-------------|
+| `/deploy` | Deploy Worker + Dashboard |
+| `/logs` | View Worker logs |
+| `/test-api` | Test API endpoints |
+| `/security-audit` | Run security audit |
+| `/db-query` | Query D1 database |
+| `/review-code` | Code review |
+| `/update-docs` | Update documentation |
+| `/memory-save` | Save to Memory MCP |
+
+---
+
+## Agents
+
+| Agent | Model | Use When |
+|-------|-------|----------|
+| **debugger** | sonnet | Errors, failures |
+| **api-tester** | haiku | Test endpoints |
+| **security-auditor** | haiku | Security review |
+| **code-reviewer** | sonnet | Code quality |
+| **test-runner** | haiku | Run tests |
+| **documentation** | sonnet | Update docs |
+
+---
+
+## Quick Commands
+
+```bash
+# Worker
+npm run typecheck        # Type check
+npm test                 # Run tests
+npx wrangler dev         # Local dev
+npx wrangler deploy      # Deploy
+npx wrangler tail        # Live logs
+
+# Dashboard
+cd dashboard
+npm run dev              # Local (port 5173)
+npm run deploy           # Deploy to Pages
+
+# Database
+npx wrangler d1 execute n8n-management-mcp-db --remote --command "SELECT ..."
+```
+
+---
+
+## Critical Rules
+
+1. **Never change `ENCRYPTION_KEY`** — Breaks all encrypted credentials
+2. **Never change `JWT_SECRET`** — Invalidates all sessions
+3. **Use `withSudo()` for protected actions** — TOTP required
+4. **API key prefix is `n2f_`** — Old `saas_` keys don't work
 
 ---
 
 ## Plan System
 
-3 plans with **daily** request limits and **per-minute** rate limiting:
-
-| Plan | Daily Limit | Req/Min | Price | Features |
-|------|-------------|---------|-------|----------|
-| **Free** | 100 | 50 | $0 | Community support |
-| **Pro** | 5,000 | 100 | $19/mo | Priority support, analytics, fair use |
-| **Enterprise** | Unlimited | Unlimited | Custom | Dedicated support, private server |
-
-**Rate Limiting**:
-- Daily limits reset at midnight UTC
-- Per-minute limits use sliding window via KV
-- Unlimited connections for all plans
+| Plan | Daily Limit | Req/Min | Price |
+|------|-------------|---------|-------|
+| Free | 100 | 50 | $0 |
+| Pro | 5,000 | 100 | $19/mo |
+| Enterprise | Unlimited | Unlimited | Custom |
 
 ---
 
-## Key Files
+## Database (9 tables)
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `src/index.ts` | ~1600 | Main entry — all API routes + MCP handler |
-| `src/auth.ts` | ~800 | Register, login, API key validation, TOTP, sudo mode |
-| `src/db.ts` | ~450 | All D1 CRUD operations (users, connections, AI, bots, usage, TOTP) |
-| `src/crypto-utils.ts` | ~450 | PBKDF2, AES-256-GCM, JWT, API key generation, TOTP (RFC 6238) |
-| `src/oauth.ts` | ~330 | GitHub + Google OAuth 2.0 flows |
-| `src/stripe.ts` | ~295 | Stripe checkout, billing portal, webhook handler |
-| `src/tools.ts` | ~375 | 31 MCP tool definitions |
-| `src/n8n-client.ts` | ~215 | HTTP client for n8n Public API v1 |
-| `src/saas-types.ts` | ~215 | TypeScript interfaces (Env, User, Connection, etc.) |
-| `src/types.ts` | ~75 | Base MCP types |
-| `schema.sql` | ~150 | D1 database schema (6 core tables + indexes) |
-| `stdio-server.js` | ~800 | Stdio server for Claude Desktop/Code (SaaS + Direct modes) |
+`users`, `n8n_connections`, `api_keys`, `ai_connections`, `bot_connections`, `usage_logs`, `usage_monthly`, `plans`, `admin_logs`
 
-### Dashboard (`dashboard/`)
-
-| File | Purpose |
-|------|---------|
-| `src/components/Layout.tsx` | Main layout with sidebar (user pages) |
-| `src/components/AdminLayout.tsx` | Admin panel layout |
-| `src/components/SudoModal.tsx` | TOTP verification modal |
-| `src/pages/Login.tsx` | Email + OAuth login |
-| `src/pages/Register.tsx` | Email + OAuth registration (requires terms acceptance) |
-| `src/pages/Terms.tsx` | Terms of Service page |
-| `src/pages/Privacy.tsx` | Privacy Policy page |
-| `src/pages/Dashboard.tsx` | Overview + stats |
-| `src/pages/Connections.tsx` | n8n connections + API keys |
-| `src/pages/Usage.tsx` | Usage statistics + plan comparison |
-| `src/pages/Settings.tsx` | Profile, password, 2FA setup, danger zone |
-| `src/pages/admin/*.tsx` | Admin: overview, users, analytics, revenue, health |
-| `src/pages/n8n/*.tsx` | n8n UI: workflows, executions, credentials, tags, users |
-| `src/lib/api.ts` | API client (all CF Worker endpoints) |
-| `src/contexts/AuthContext.tsx` | Auth state management |
-| `src/contexts/SudoContext.tsx` | Sudo mode + TOTP context |
-| `src/hooks/useSudo.ts` | Sudo state hook |
-| `src/index.css` | Tailwind + custom n2f-* color variables |
-
-### Dashboard Theme
-
-Dark theme with **orange accent** color:
-- `n2f-bg` — Background (#0a0a0a)
-- `n2f-card` — Card background (#141414)
-- `n2f-elevated` — Elevated surfaces (#1f1f1f)
-- `n2f-border` — Borders (#2a2a2a)
-- `n2f-accent` — Orange accent (#f97316)
-- `n2f-text` — Primary text (#fafafa)
-- `n2f-text-secondary` — Secondary text (#a3a3a3)
-- `n2f-text-muted` — Muted text (#737373)
+See [`migrations/CLAUDE.md`](migrations/CLAUDE.md) for schema details.
 
 ---
 
-## Database (Cloudflare D1)
+## Auth Systems
 
-9 tables total. Schema in `schema.sql` + migrations.
-
-**Core tables**: `users`, `n8n_connections`, `api_keys`, `usage_logs`, `usage_monthly`, `plans`, `admin_logs`
-
-**Added via migrations**: `ai_connections`, `bot_connections`
-
-Key relationships:
-- `users` → `n8n_connections` (1:many) → `api_keys` (1:many)
-- `users` → `ai_connections` (1:many)
-- `users` → `bot_connections` (1:many)
-- `ai_connections` → `bot_connections` (1:many, via ai_connection_id)
+| Type | Header | Used By |
+|------|--------|---------|
+| JWT | `Bearer eyJhbG...` | Dashboard |
+| API Key | `Bearer n2f_xxx` | MCP clients |
+| OAuth | Redirect flow | GitHub/Google |
+| HMAC | `X-HMAC-Signature` | Vercel agent |
 
 ---
 
-## Auth Systems (4 types)
+**Version**: 2.0 | Updated: 2026-02-04
 
-| Auth | Used By | How |
-|------|---------|-----|
-| **Email/Password** | Dashboard login | PBKDF2 hash → JWT (24 hours) |
-| **OAuth 2.0** | Dashboard login | GitHub/Google → JWT |
-| **SaaS API Key** | MCP clients | `Bearer n2f_xxx` → SHA-256 lookup → decrypt n8n key |
-| **HMAC-SHA256** | Vercel agent | `HMAC(AGENT_SECRET, "userId:aiConnectionId")` → decrypt AI/bot keys |
-
----
-
-## Security
-
-- Password: PBKDF2 with 100,000 iterations
-- Credentials: AES-256-GCM (n8n API keys, AI API keys, bot tokens, TOTP secrets)
-- JWT: HS256 signing, 24-hour expiry
-- API keys: SHA-256 hashed (plain text never stored)
-- OAuth state: KV-stored CSRF tokens (10 min TTL)
-- Stripe webhooks: HMAC-SHA256 signature verification
-- **TOTP (2FA)**: RFC 6238 compliant, HMAC-SHA1, 30-second window
-
-**Critical secrets (never change after first use)**:
-- `ENCRYPTION_KEY` — Changing breaks all encrypted credentials (including TOTP secrets)
-- `JWT_SECRET` — Changing invalidates all active sessions
-
----
-
-## Sudo Mode (2FA / TOTP)
-
-Sensitive actions require **Two-Factor Authentication** verification via TOTP (Google Authenticator, Authy, etc.).
-
-### Protected Actions
-
-| Page | Action | Requires Sudo |
-|------|--------|---------------|
-| **Connections** | Delete connection | ✅ |
-| **Connections** | Generate new API key | ✅ |
-| **Connections** | Revoke API key | ✅ |
-| **Settings** | Change password | ✅ |
-| **Settings** | Delete account | ✅ |
-| **Admin Users** | Delete user | ✅ |
-
-### How It Works
-
-1. User enables TOTP in Settings → Security → Two-Factor Authentication
-2. Scan QR code with authenticator app
-3. Verify with 6-digit code to enable
-4. When performing sensitive action:
-   - If no active sudo session → modal asks for TOTP code
-   - If valid → sudo session created (15 minutes)
-   - Subsequent actions within 15 minutes don't require re-verification
-
-### TOTP API Endpoints
-
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/api/auth/totp/setup` | POST | Generate secret + QR code URL |
-| `/api/auth/totp/enable` | POST | Verify code and enable TOTP |
-| `/api/auth/totp/status` | GET | Check if TOTP is enabled |
-| `/api/auth/totp/disable` | POST | Disable TOTP (requires password) |
-| `/api/auth/verify-sudo` | POST | Verify TOTP code, create sudo session |
-| `/api/auth/sudo-status` | GET | Check sudo session + TOTP status |
-
-### Database Columns (users table)
-
-```sql
-totp_secret_encrypted TEXT    -- AES-256-GCM encrypted TOTP secret
-totp_enabled INTEGER DEFAULT 0  -- 0 = disabled, 1 = enabled
-```
-
-### Dashboard Files
-
-| File | Purpose |
-|------|---------|
-| `src/hooks/useSudo.ts` | Sudo state management, TOTP verification |
-| `src/contexts/SudoContext.tsx` | Sudo context provider, `withSudo` wrapper |
-| `src/components/SudoModal.tsx` | TOTP code input modal |
-| `src/pages/Settings.tsx` | TOTP setup UI with QR code |
-
----
-
-## Cloudflare Resources
-
-| Resource | ID/Name |
-|----------|---------|
-| Worker | `n8n-management-mcp` |
-| D1 Database | `705840e0-4663-430e-9f3b-3778c209e525` (n8n-management-mcp-db, APAC/SIN) |
-| KV Namespace | `45d5d994b649440ab34e4f0a3a5eaa66` (RATE_LIMIT_KV) |
-| Pages | `n8n-mcp-dashboard` |
-
----
-
-## Environment / Secrets
-
-### Set on Workers (via `wrangler secret put`)
-
-| Secret | Status | Purpose |
-|--------|--------|---------|
-| `JWT_SECRET` | Set | JWT signing (32-byte hex) |
-| `ENCRYPTION_KEY` | Set | AES-GCM encryption (32-byte hex) |
-| `GITHUB_CLIENT_ID` | Set | GitHub OAuth |
-| `GITHUB_CLIENT_SECRET` | Set | GitHub OAuth |
-| `GOOGLE_CLIENT_ID` | Set | Google OAuth |
-| `GOOGLE_CLIENT_SECRET` | Set | Google OAuth |
-| `APP_URL` | Set | `https://n8n-management-dashboard.node2flow.net` |
-| `AGENT_SECRET` | Set | HMAC shared secret (matches Vercel) |
-| `AGENT_URL` | Set | `https://agent-chi-wine.vercel.app` |
-| `STRIPE_SECRET_KEY` | Not set | Stripe billing |
-| `STRIPE_WEBHOOK_SECRET` | Not set | Stripe webhook verification |
-| `STRIPE_PRICE_*` | Not set | Stripe price IDs |
-
-### Dashboard env
-
-```
-VITE_API_URL=https://n8n-management-mcp.node2flow.net
-```
-
----
-
-## Commands
-
-```bash
-# Worker
-npm install                  # Install deps
-npm run typecheck            # TypeScript check
-npm test                     # Run tests (vitest)
-npx wrangler dev             # Local dev
-npx wrangler deploy          # Deploy to Cloudflare
-npx wrangler tail            # Real-time logs
-
-# Dashboard
-cd dashboard
-npm install
-npm run dev                  # Local dev (Vite, port 5173)
-npm run build                # Build
-npm run deploy               # Build + deploy to Cloudflare Pages
-
-# Database
-npx wrangler d1 execute n8n-management-mcp-db --remote --file=./schema.sql
-npx wrangler d1 execute n8n-management-mcp-db --remote --command "SELECT ..."
-
-# Reset usage stats
-npx wrangler d1 execute n8n-management-mcp-db --remote --command "DELETE FROM usage_logs; DELETE FROM usage_monthly;"
-
-# Secrets
-wrangler secret put SECRET_NAME
-```
-
----
-
-## Connected Project: n8n-mcp-agent
-
-The Vercel Next.js app (`n8n-mcp-agent/`) connects to this Worker:
-
-- **Chat API** (`/api/chat`) → calls `/api/agent/config` (HMAC) to get AI credentials, then `/mcp` (n2f_ key) for tools
-- **Dashboard UI** → calls JWT-protected endpoints directly from browser
-- **Webhooks** (`/api/webhook/telegram/[userId]`, `/api/webhook/line/[userId]`) → calls `/api/agent/bot-config` (HMAC)
-
-Shared secrets: `AGENT_SECRET` must match on both Vercel and CF Worker.
-
----
-
-## Things to NOT Do
-
-- Don't change `ENCRYPTION_KEY` — Breaks all encrypted credentials in D1 (including TOTP secrets)
-- Don't change `JWT_SECRET` — Invalidates all active user sessions
-- Don't modify auth flows without understanding all 4 auth types + TOTP
-- Don't add CORS restrictions — Agent and Dashboard call from different origins
-- Don't remove `stripe_customer_id` from users table — Needed for billing
-- Don't add "Starter" plan — Removed, only Free/Pro/Enterprise exist
-- Don't bypass sudo checks — Protected actions must require TOTP verification
-- Don't store TOTP secrets unencrypted — Always use AES-256-GCM via `encrypt()`
-
----
-
-## Handoff / Recent Changes (2026-02-04)
-
-### API Key Prefix Changed (Breaking Change)
-- Changed prefix from `saas_` to `n2f_`
-- **Old keys (`saas_xxx`) no longer work** — users must generate new keys
-- Files updated: `crypto-utils.ts`, `auth.ts`, `stdio-server.js`, tests, all docs
-
-### Terms & Privacy Pages Added
-- `/terms` — Terms of Service page
-- `/privacy` — Privacy Policy page
-- Both are public routes (no auth required)
-
-### Registration Flow Changed
-- Terms checkbox now appears **first** at top of register page
-- All form inputs and OAuth buttons **disabled** until checkbox is ticked
-- "Sign in" link remains clickable for existing users
-- OAuth buttons (GitHub/Google) added to register page
-
-### Dashboard Fixes
-- Fixed label: "Monthly Usage" → "Daily Usage" (matches daily limit system)
-- Fixed infinite redirect loop in `useSudo.ts` (check `isAuthenticated()` before API call)
-
-### TOTP (Two-Factor Authentication) Added
-- Replaced email OTP with **TOTP** (RFC 6238) for sudo mode
-- Users set up 2FA via QR code in Settings → Security
-- Supported apps: Google Authenticator, Authy, 1Password, etc.
-- TOTP secret stored encrypted (AES-256-GCM) in `users.totp_secret_encrypted`
-- Sudo session lasts **15 minutes** after verification
-- Migration: `migrations/005_totp.sql`
-
-### Protected Actions (require 2FA)
-- Delete connection, Generate/Revoke API key (Connections page)
-- Change password, Delete account (Settings page)
-- Delete user (Admin Users page)
-
-### New Dashboard Components
-- `SudoModal.tsx` — TOTP code input (6-digit, auto-submit)
-- `useSudo.ts` — Hook for sudo state + TOTP verification
-- `SudoContext.tsx` — `withSudo()` wrapper for protected actions
-- Settings page — TOTP setup UI with QR code display
-
-### API Changes
-- Removed: `/api/auth/request-sudo` (email OTP)
-- Added: `/api/auth/totp/setup`, `/api/auth/totp/enable`, `/api/auth/totp/status`, `/api/auth/totp/disable`
-- Updated: `/api/auth/verify-sudo` now accepts TOTP code
-- Updated: `/api/auth/sudo-status` returns `totp_enabled` boolean
-
-### Removed
-- Email OTP system (MailChannels) — service discontinued Aug 2024
-- `src/email.ts` — no longer used (can be deleted)
-
----
-
-## Previous Changes (2026-02-03)
-
-### Plan System Simplified
-- Removed "Starter" plan — now only **Free**, **Pro**, **Enterprise**
-- Changed from monthly limits to **daily limits**
-- Added **per-minute rate limiting** via KV sliding window
-- All plans have **unlimited n8n connections**
-
-### Dashboard Theme Updated
-- Changed accent color from red to **orange** (`#f97316`)
-- Sidebar name: "n8n Management MCP"
-- All pages use dark theme with `n2f-*` color classes
-- Admin panel fully converted to dark theme
-
-### Admin Panel Fixes
-- Removed "Starter" from plan filter and dropdown in AdminUsers
-- Removed "Starter" color mapping in AdminRevenue
-- Updated all loaders to use `text-n2f-accent` (orange)
-- Fixed dropdown/input backgrounds for dark theme
-- AdminLayout and ConfirmDialog converted to dark theme
-
-### Usage Page
-- Current plan card changed from orange gradient to standard dark card
-- Price displayed in accent color
-
-### API Updates
-- `/api/plans` returns `daily_request_limit` and `requests_per_minute`
-- `/api/usage` returns daily stats with `reset_at` timestamp
-- Rate limit headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
-
-### Database
-- Usage stats reset: `DELETE FROM usage_logs; DELETE FROM usage_monthly;`
-
----
-
-**Version**: 1.3 | Updated: 2026-02-04
+**Changelog v2.0**:
+- Distributed CLAUDE.md across source folders
+- Added MCP servers integration
+- Added slash commands reference
+- Added agent delegation matrix

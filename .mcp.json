@@ -1,0 +1,68 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/claude-code/main/schemas/mcp-config.schema.json",
+  "mcpServers": {
+    "cloudflare-observability": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://observability.mcp.cloudflare.com/mcp"],
+      "disabled": false
+    },
+    "cloudflare-workers": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://bindings.mcp.cloudflare.com/mcp"],
+      "disabled": false
+    },
+    "cloudflare-docs": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://docs.mcp.cloudflare.com/mcp"],
+      "disabled": false
+    },
+    "stripe": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@stripe/mcp",
+        "--tools=customers.create,customers.read,subscriptions.read,subscriptions.update,subscriptions.cancel,products.read,prices.read,invoices.read,documentation.read"
+      ],
+      "env": {
+        "STRIPE_SECRET_KEY": "${STRIPE_SECRET_KEY}"
+      },
+      "disabled": true
+    },
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
+      },
+      "disabled": true
+    },
+    "memory": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "env": {
+        "MEMORY_FILE_PATH": ".claude/memory.jsonl"
+      },
+      "disabled": false
+    },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest",
+        "--headless"
+      ],
+      "disabled": true
+    },
+    "sqlite": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sqlite",
+        "./local-d1.db"
+      ],
+      "disabled": true
+    }
+  }
+}

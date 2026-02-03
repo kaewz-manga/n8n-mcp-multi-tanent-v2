@@ -69,3 +69,35 @@ Fix: How to fix it
 ```
 
 Severities: 🔴 Critical, 🟠 Warning, 🟡 Suggestion
+
+---
+
+## MCP Tools Available
+
+| MCP | Tool | When to Use |
+|-----|------|-------------|
+| **cloudflare-docs** | Search docs | Verify CF Workers patterns are correct |
+| **memory** | Search, create | Check past decisions, record new patterns |
+
+### Review Workflow with MCP
+
+1. **Check patterns**: Use `cloudflare-docs` to verify best practices
+2. **Check history**: Use `memory` to find past architectural decisions
+3. **Record decisions**: If reviewing new patterns, log in Memory
+
+### Example MCP Usage
+
+```
+# Verify D1 pattern is correct
+Tool: cloudflare-docs → search
+Query: "D1 batch operations"
+
+# Check if similar pattern was discussed before
+Tool: mcp__memory__search_nodes
+Query: "decision database pattern"
+
+# Record new architectural decision
+Tool: mcp__memory__create_entities
+Entity: decision-use-batch-operations
+Observations: "Use D1 batch() for multiple writes for atomicity"
+```

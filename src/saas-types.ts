@@ -14,6 +14,9 @@ export interface User {
   status: 'active' | 'suspended' | 'deleted';
   stripe_customer_id: string | null;
   session_duration_seconds: number;
+  is_admin?: number;
+  oauth_provider?: string;
+  oauth_id?: string;
   created_at: string;
   updated_at: string;
 }

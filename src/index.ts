@@ -211,9 +211,7 @@ async function handleToolCall(
         break;
 
       // Credential operations
-      case 'n8n_list_credentials':
-        result = await client.listCredentials();
-        break;
+      // Note: n8n_list_credentials removed - n8n Community Edition returns 405 on GET /api/v1/credentials
       case 'n8n_create_credential':
         result = await client.createCredential(args);
         break;
@@ -855,6 +853,9 @@ async function handleManagementApi(
     }
     const client = new N8nClient({ apiUrl: connection.n8n_url, apiKey: n8nApiKey });
 
+    // Extract userId for use in closure (authUser verified non-null above)
+    const userId = authUser.userId;
+
     // Helper to execute n8n call with usage logging
     async function proxyCall(toolName: string, fn: () => Promise<any>) {
       const start = Date.now();
@@ -862,15 +863,15 @@ async function handleManagementApi(
         const result = await fn();
         const elapsed = Date.now() - start;
         await Promise.all([
-          incrementMonthlyUsage(env.DB, authUser.userId, yearMonth, true),
-          logUsage(env.DB, authUser.userId, 'dashboard', connectionId!, toolName, 'success', elapsed, null),
+          incrementMonthlyUsage(env.DB, userId, yearMonth, true),
+          logUsage(env.DB, userId, 'dashboard', connectionId!, toolName, 'success', elapsed, null),
         ]);
         return apiResponse({ success: true, data: result });
       } catch (err: any) {
         const elapsed = Date.now() - start;
         await Promise.all([
-          incrementMonthlyUsage(env.DB, authUser.userId, yearMonth, false),
-          logUsage(env.DB, authUser.userId, 'dashboard', connectionId!, toolName, 'error', elapsed, err.message),
+          incrementMonthlyUsage(env.DB, userId, yearMonth, false),
+          logUsage(env.DB, userId, 'dashboard', connectionId!, toolName, 'error', elapsed, err.message),
         ]);
         return apiResponse({ success: false, error: { code: 'N8N_ERROR', message: err.message } }, 502);
       }

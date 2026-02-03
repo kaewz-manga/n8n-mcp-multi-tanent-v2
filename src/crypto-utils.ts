@@ -95,6 +95,7 @@ interface JWTPayload {
   sub: string; // user_id
   email: string;
   plan: string;
+  is_admin?: number;
   iat: number;
   exp: number;
 }

@@ -41,6 +41,7 @@ There is also a **Dashboard** (React 19 SPA) in `dashboard/` deployed on Cloudfl
 │  /api/agent/*      → HMAC auth for Vercel agent                  │
 │  /api/admin/*      → Admin panel APIs                            │
 │  /api/billing/*    → Stripe checkout/portal                      │
+│  /api/plans        → Public plans list                           │
 │                                                                  │
 │  D1 Database ──── KV (Rate Limit + OAuth State)                  │
 └──────────────────────┬───────────────────────────────────────────┘
@@ -51,6 +52,23 @@ There is also a **Dashboard** (React 19 SPA) in `dashboard/` deployed on Cloudfl
                │  (Customer's)  │
                └───────────────┘
 ```
+
+---
+
+## Plan System
+
+3 plans with **daily** request limits and **per-minute** rate limiting:
+
+| Plan | Daily Limit | Req/Min | Price | Features |
+|------|-------------|---------|-------|----------|
+| **Free** | 100 | 50 | $0 | Community support |
+| **Pro** | 5,000 | 100 | $19/mo | Priority support, analytics, fair use |
+| **Enterprise** | Unlimited | Unlimited | Custom | Dedicated support, private server |
+
+**Rate Limiting**:
+- Daily limits reset at midnight UTC
+- Per-minute limits use sliding window via KV
+- Unlimited connections for all plans
 
 ---
 
@@ -75,15 +93,30 @@ There is also a **Dashboard** (React 19 SPA) in `dashboard/` deployed on Cloudfl
 
 | File | Purpose |
 |------|---------|
+| `src/components/Layout.tsx` | Main layout with sidebar (user pages) |
+| `src/components/AdminLayout.tsx` | Admin panel layout |
 | `src/pages/Login.tsx` | Email + OAuth login |
 | `src/pages/Dashboard.tsx` | Overview + stats |
 | `src/pages/Connections.tsx` | n8n connections + API keys |
-| `src/pages/Usage.tsx` | Usage statistics |
+| `src/pages/Usage.tsx` | Usage statistics + plan comparison |
 | `src/pages/Settings.tsx` | Profile, password, danger zone |
-| `src/pages/admin/*.tsx` | Admin: users, analytics, revenue, health |
-| `src/pages/n8n/*.tsx` | n8n UI: workflows, executions, credentials, tags, variables, users |
+| `src/pages/admin/*.tsx` | Admin: overview, users, analytics, revenue, health |
+| `src/pages/n8n/*.tsx` | n8n UI: workflows, executions, credentials, tags, users |
 | `src/lib/api.ts` | API client (all CF Worker endpoints) |
 | `src/contexts/AuthContext.tsx` | Auth state management |
+| `src/index.css` | Tailwind + custom n2f-* color variables |
+
+### Dashboard Theme
+
+Dark theme with **orange accent** color:
+- `n2f-bg` — Background (#0a0a0a)
+- `n2f-card` — Card background (#141414)
+- `n2f-elevated` — Elevated surfaces (#1f1f1f)
+- `n2f-border` — Borders (#2a2a2a)
+- `n2f-accent` — Orange accent (#f97316)
+- `n2f-text` — Primary text (#fafafa)
+- `n2f-text-secondary` — Secondary text (#a3a3a3)
+- `n2f-text-muted` — Muted text (#737373)
 
 ---
 
@@ -176,7 +209,7 @@ npm run typecheck            # TypeScript check
 npm test                     # Run tests (vitest)
 npx wrangler dev             # Local dev
 npx wrangler deploy          # Deploy to Cloudflare
-npx wrangler tail             # Real-time logs
+npx wrangler tail            # Real-time logs
 
 # Dashboard
 cd dashboard
@@ -188,6 +221,9 @@ npm run deploy               # Build + deploy to Cloudflare Pages
 # Database
 npx wrangler d1 execute n8n-management-mcp-db --remote --file=./schema.sql
 npx wrangler d1 execute n8n-management-mcp-db --remote --command "SELECT ..."
+
+# Reset usage stats
+npx wrangler d1 execute n8n-management-mcp-db --remote --command "DELETE FROM usage_logs; DELETE FROM usage_monthly;"
 
 # Secrets
 wrangler secret put SECRET_NAME
@@ -214,7 +250,43 @@ Shared secrets: `AGENT_SECRET` must match on both Vercel and CF Worker.
 - Don't modify auth flows without understanding all 4 auth types
 - Don't add CORS restrictions — Agent and Dashboard call from different origins
 - Don't remove `stripe_customer_id` from users table — Needed for billing
+- Don't add "Starter" plan — Removed, only Free/Pro/Enterprise exist
 
 ---
 
-**Version**: 1.0 | Created: 2026-02-02
+## Handoff / Recent Changes (2026-02-03)
+
+### Plan System Simplified
+- Removed "Starter" plan — now only **Free**, **Pro**, **Enterprise**
+- Changed from monthly limits to **daily limits**
+- Added **per-minute rate limiting** via KV sliding window
+- All plans have **unlimited n8n connections**
+
+### Dashboard Theme Updated
+- Changed accent color from red to **orange** (`#f97316`)
+- Sidebar name: "n8n Management MCP"
+- All pages use dark theme with `n2f-*` color classes
+- Admin panel fully converted to dark theme
+
+### Admin Panel Fixes
+- Removed "Starter" from plan filter and dropdown in AdminUsers
+- Removed "Starter" color mapping in AdminRevenue
+- Updated all loaders to use `text-n2f-accent` (orange)
+- Fixed dropdown/input backgrounds for dark theme
+- AdminLayout and ConfirmDialog converted to dark theme
+
+### Usage Page
+- Current plan card changed from orange gradient to standard dark card
+- Price displayed in accent color
+
+### API Updates
+- `/api/plans` returns `daily_request_limit` and `requests_per_minute`
+- `/api/usage` returns daily stats with `reset_at` timestamp
+- Rate limit headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
+
+### Database
+- Usage stats reset: `DELETE FROM usage_logs; DELETE FROM usage_monthly;`
+
+---
+
+**Version**: 1.1 | Updated: 2026-02-03

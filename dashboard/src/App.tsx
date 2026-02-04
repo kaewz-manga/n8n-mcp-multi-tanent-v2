@@ -24,6 +24,7 @@ import N8nUserList from './pages/n8n/N8nUserList';
 import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
 import FAQ from './pages/FAQ';
+import Documentation from './pages/Documentation';
 import { ConnectionProvider } from './contexts/ConnectionContext';
 import { SudoProvider } from './contexts/SudoContext';
 import { Loader2 } from 'lucide-react';
@@ -94,6 +95,7 @@ function AppRoutes() {
       <Route path="/terms" element={<Terms />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/faq" element={<FAQ />} />
+      <Route path="/docs" element={<Documentation />} />
 
       {/* Protected routes */}
       <Route

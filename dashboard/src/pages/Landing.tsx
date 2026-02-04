@@ -252,8 +252,8 @@ Would you like me to activate the Data Sync Pipeline?`}</code>
             <div>
               <h3 className="text-n2f-text font-semibold mb-4">Resources</h3>
               <ul className="space-y-3">
-                <li><a href="#" className="text-n2f-text-muted hover:text-n2f-accent">Documentation</a></li>
-                <li><a href="#" className="text-n2f-text-muted hover:text-n2f-accent">API Reference</a></li>
+                <li><Link to="/docs" className="text-n2f-text-muted hover:text-n2f-accent">Documentation</Link></li>
+                <li><Link to="/docs?tab=api" className="text-n2f-text-muted hover:text-n2f-accent">API Reference</Link></li>
                 <li>
                   <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-n2f-text-muted hover:text-n2f-accent inline-flex items-center gap-1">
                     GitHub <ExternalLink className="h-3 w-3" />

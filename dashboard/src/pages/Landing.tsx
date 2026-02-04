@@ -244,7 +244,7 @@ Would you like me to activate the Data Sync Pipeline?`}</code>
                 <li><a href="#features" className="text-n2f-text-muted hover:text-n2f-accent">Features</a></li>
                 <li><a href="#pricing" className="text-n2f-text-muted hover:text-n2f-accent">Pricing</a></li>
                 <li><a href="#demo" className="text-n2f-text-muted hover:text-n2f-accent">Demo</a></li>
-                <li><a href="#faq" className="text-n2f-text-muted hover:text-n2f-accent">FAQ</a></li>
+                <li><Link to="/faq" className="text-n2f-text-muted hover:text-n2f-accent">FAQ</Link></li>
               </ul>
             </div>
 

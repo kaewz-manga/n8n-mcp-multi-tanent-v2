@@ -12,7 +12,7 @@ export default function Terms() {
               <div className="bg-n2f-accent p-2 rounded-lg">
                 <Zap className="h-5 w-5 text-gray-900" />
               </div>
-              <span className="text-xl font-bold text-n2f-text">n8n MCP</span>
+              <span className="text-xl font-bold text-n2f-text">n8n Management MCP</span>
             </Link>
             <Link to="/" className="text-n2f-text-secondary hover:text-n2f-text flex items-center gap-2">
               <ArrowLeft className="h-4 w-4" />

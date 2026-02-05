@@ -28,3 +28,13 @@ Thumbs.db
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Local database
+local-d1.db
+*.db
+
+# Test reports
+API_TEST_REPORT*.txt
+
+# Screenshots
+*.png

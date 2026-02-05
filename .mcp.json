@@ -2,23 +2,25 @@
   "$schema": "https://raw.githubusercontent.com/anthropics/claude-code/main/schemas/mcp-config.schema.json",
   "mcpServers": {
     "cloudflare-observability": {
-      "command": "npx",
-      "args": ["mcp-remote", "https://observability.mcp.cloudflare.com/mcp"],
+      "command": "cmd",
+      "args": ["/c", "npx", "mcp-remote", "https://observability.mcp.cloudflare.com/mcp"],
       "disabled": false
     },
     "cloudflare-workers": {
-      "command": "npx",
-      "args": ["mcp-remote", "https://bindings.mcp.cloudflare.com/mcp"],
+      "command": "cmd",
+      "args": ["/c", "npx", "mcp-remote", "https://bindings.mcp.cloudflare.com/mcp"],
       "disabled": false
     },
     "cloudflare-docs": {
-      "command": "npx",
-      "args": ["mcp-remote", "https://docs.mcp.cloudflare.com/mcp"],
+      "command": "cmd",
+      "args": ["/c", "npx", "mcp-remote", "https://docs.mcp.cloudflare.com/mcp"],
       "disabled": false
     },
     "stripe": {
-      "command": "npx",
+      "command": "cmd",
       "args": [
+        "/c",
+        "npx",
         "-y",
         "@stripe/mcp",
         "--tools=customers.create,customers.read,subscriptions.read,subscriptions.update,subscriptions.cancel,products.read,prices.read,invoices.read,documentation.read"
@@ -29,8 +31,10 @@
       "disabled": true
     },
     "github": {
-      "command": "npx",
+      "command": "cmd",
       "args": [
+        "/c",
+        "npx",
         "-y",
         "@modelcontextprotocol/server-github"
       ],
@@ -40,29 +44,47 @@
       "disabled": true
     },
     "memory": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@modelcontextprotocol/server-memory"],
       "env": {
         "MEMORY_FILE_PATH": "D:/Dev/playground/Claude_Code_Commander/n8n-management-mcp/.memory/infrastructure.jsonl"
       },
       "disabled": false
     },
     "playwright": {
-      "command": "npx",
+      "command": "cmd",
       "args": [
+        "/c",
+        "npx",
         "@playwright/mcp@latest",
         "--headless"
       ],
       "disabled": true
     },
     "sqlite": {
-      "command": "npx",
+      "command": "cmd",
       "args": [
+        "/c",
+        "npx",
         "-y",
         "@modelcontextprotocol/server-sqlite",
-        "./local-d1.db"
+        "D:/Dev/playground/Claude_Code_Commander/n8n-management-mcp/local-d1.db"
       ],
-      "disabled": true
+      "disabled": false
+    },
+    "n8n-mcp": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@anthropics/n8n-mcp"],
+      "env": {
+        "N8N_API_URL": "https://n8n-no1.missmanga.org",
+        "N8N_API_KEY": "${N8N_API_KEY}"
+      },
+      "disabled": false
+    },
+    "n8n-mcp-remote": {
+      "command": "cmd",
+      "args": ["/c", "npx", "mcp-remote", "https://n8n-mcp-remote.missmanga.org/sse"],
+      "disabled": false
     }
   }
 }

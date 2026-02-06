@@ -38,7 +38,62 @@ It connects to this Worker via:
 
 ## สถานะปัจจุบัน (2026-02-08)
 
-### ✅ ล่าสุด (2026-02-08 - Session 6)
+### ✅ ล่าสุด (2026-02-08 - Session 7)
+
+**Admin System Controls + Copy MCP URL (7 files: 1 new, 6 modified)**:
+
+1. **Admin System Control Endpoints (Backend)**
+   - `POST /api/admin/system/recalculate-stats` — Rebuild usage_monthly + platform_stats from data (confirmation: "CONFIRM")
+   - `POST /api/admin/system/clear-logs` — Delete all usage_logs + usage_monthly, reset counters (TOTP sudo + "CONFIRM")
+   - `POST /api/admin/system/full-reset` — Delete all non-admin users and data (TOTP sudo + "FULL RESET")
+   - `GET /api/admin/system/maintenance` — Read maintenance mode status
+   - `POST /api/admin/system/maintenance` — Toggle maintenance mode (TOTP sudo)
+
+2. **Maintenance Mode Guard**
+   - KV-based (`system:maintenance_mode` key in RATE_LIMIT_KV)
+   - When enabled: all non-admin, non-login routes return 503 MAINTENANCE_MODE
+   - Admin routes + login + verify-sudo remain accessible
+   - Custom message support
+
+3. **DB Functions (6 new)**
+   - `recalculateUsageMonthly()` — DELETE + INSERT...SELECT grouped by user_id/month
+   - `recalculatePlatformStats()` — COUNT from users/usage_logs, UPSERT platform_stats
+   - `clearAllLogs()` — DELETE usage_logs + usage_monthly, reset counters
+   - `fullSystemReset()` — Delete non-admin users + all related data, reset stats
+   - `getMaintenanceMode()` / `setMaintenanceMode()` — KV read/write
+
+4. **AdminSystem.tsx (New Page)**
+   - 4 cards: Maintenance Mode, Recalculate Stats, Clear Logs, Full System Reset
+   - Inline confirmation inputs (type "CONFIRM" or "FULL RESET")
+   - TOTP sudo for destructive operations (clear logs, full reset, maintenance toggle)
+   - Success messages with detailed counts
+   - Danger zone card with red border for full reset
+
+5. **Copy MCP URL Button**
+   - Added to Connections page (top, before connection list)
+   - Shows MCP endpoint URL with Copy button
+   - Copied state: green check + "Copied" text (2s timeout)
+
+**New Files**:
+- `dashboard/src/pages/admin/AdminSystem.tsx` — Admin system controls page
+
+**Modified Files**:
+- `src/db.ts` — +183 lines: 6 system control functions + MaintenanceState interface
+- `src/index.ts` — +120 lines: 5 admin endpoints + maintenance mode guard in fetch handler
+- `dashboard/src/lib/api.ts` — +56 lines: 5 API client functions + MaintenanceState type
+- `dashboard/src/App.tsx` — Added `/admin/system` route + AdminSystem import
+- `dashboard/src/components/AdminLayout.tsx` — Added "System" nav item with Wrench icon
+- `dashboard/src/pages/Connections.tsx` — Added MCP URL card with copy button
+
+**Deployed**: Worker `c7d63e0e` + Dashboard `137f4f53`
+
+**Commits**:
+- `10409f2` feat: add admin system controls (maintenance, recalculate, clear, reset)
+- `710a3f9` feat: add copy MCP URL button on connections page
+
+---
+
+### ✅ ก่อนหน้า (2026-02-08 - Session 6)
 
 **Feedback Bubble Feature (10 files: 3 new, 7 modified)**:
 
@@ -431,9 +486,9 @@ It connects to this Worker via:
 ```
 n8n-management-mcp/
 ├── src/
-│   ├── index.ts          # Main Worker - API routes + MCP handler (~1600 lines)
+│   ├── index.ts          # Main Worker - API routes + MCP handler (~2050 lines)
 │   ├── auth.ts           # Auth - register, login, API key validation (~530 lines)
-│   ├── db.ts             # D1 database layer - all CRUD (~500 lines)
+│   ├── db.ts             # D1 database layer - all CRUD (~1450 lines)
 │   ├── crypto-utils.ts   # PBKDF2, AES-GCM, JWT, API key gen (~345 lines)
 │   ├── oauth.ts          # GitHub + Google OAuth flow (~330 lines)
 │   ├── stripe.ts         # Stripe checkout, portal, webhooks (~295 lines)
@@ -457,7 +512,8 @@ n8n-management-mcp/
 │   │   │   ├── Documentation.tsx # Docs + MCP tools (NEW 2026-02-05)
 │   │   │   ├── Status.tsx    # Real-time health monitor (NEW 2026-02-05)
 │   │   │   └── AccountDeleted.tsx # Account deleted confirmation (NEW 2026-02-07)
-│   │   │   └── admin/AdminFeedback.tsx # Admin feedback management (NEW 2026-02-08)
+│   │   │   ├── admin/AdminFeedback.tsx # Admin feedback management (NEW 2026-02-08)
+│   │   │   └── admin/AdminSystem.tsx  # Admin system controls (NEW 2026-02-08)
 │   │   ├── components/Layout.tsx  # Sidebar navigation + FeedbackBubble
 │   │   ├── components/FeedbackBubble.tsx # Floating feedback bubble (NEW 2026-02-08)
 │   │   ├── contexts/AuthContext.tsx # Auth state management
@@ -557,6 +613,11 @@ n8n-management-mcp/
 | `/api/admin/users/:id/plan` | PUT | Update user plan |
 | `/api/admin/feedback` | GET | List all feedback (paginated + filters) |
 | `/api/admin/feedback/:id` | PUT | Update feedback status + admin notes |
+| `/api/admin/system/recalculate-stats` | POST | Recalculate usage_monthly + platform_stats |
+| `/api/admin/system/clear-logs` | POST | Delete all logs + reset counters (sudo) |
+| `/api/admin/system/full-reset` | POST | Delete all non-admin data (sudo) |
+| `/api/admin/system/maintenance` | GET | Get maintenance mode status |
+| `/api/admin/system/maintenance` | POST | Toggle maintenance mode (sudo) |
 
 ---
 
@@ -716,8 +777,12 @@ Claude Desktop config:
 ## Git History (Key Commits)
 
 ```
+# 2026-02-08 (Session 7 - Admin System Controls)
+710a3f9 feat: add copy MCP URL button on connections page
+10409f2 feat: add admin system controls (maintenance, recalculate, clear, reset)
+
 # 2026-02-08 (Session 6 - Feedback Bubble Feature)
-# Deployed but not yet committed — Worker df68b918, Dashboard 3fe976a3
+70ff604 feat: add feedback bubble for user feedback with admin management
 
 # 2026-02-07 (Session 5 - Platform Stats + Account Deletion Rework)
 dc74cf4 feat: show platform statistics on landing page
@@ -824,6 +889,7 @@ d3dcb23 fix: simplify delete account flow for OAuth users
 | `dashboard/src/pages/AccountDeleted.tsx` | Account deleted confirmation + register link | 2026-02-07 |
 | `dashboard/src/components/FeedbackBubble.tsx` | Floating feedback bubble + panel | 2026-02-08 |
 | `dashboard/src/pages/admin/AdminFeedback.tsx` | Admin feedback management (table + modal) | 2026-02-08 |
+| `dashboard/src/pages/admin/AdminSystem.tsx` | Admin system controls (maintenance, reset, etc.) | 2026-02-08 |
 
 ---
 

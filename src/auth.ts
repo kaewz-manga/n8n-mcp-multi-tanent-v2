@@ -146,8 +146,8 @@ export async function handleLogin(
     };
   }
 
-  // Check if user is active
-  if (user.status !== 'active') {
+  // Check if user is active or pending_deletion (allow login to recover/force-delete)
+  if (user.status !== 'active' && user.status !== 'pending_deletion') {
     return {
       success: false,
       error: {

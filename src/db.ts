@@ -1022,7 +1022,7 @@ export async function deleteOldUsageLogs(db: D1Database, daysOld: number = 90): 
 // ============================================
 
 export async function scheduleUserDeletion(db: D1Database, userId: string): Promise<string> {
-  const deletionDate = new Date(Date.now() + 30 * 86400000).toISOString();
+  const deletionDate = new Date(Date.now() + 14 * 86400000).toISOString();
   await db
     .prepare('UPDATE users SET status = ?, scheduled_deletion_at = ?, updated_at = ? WHERE id = ?')
     .bind('pending_deletion', deletionDate, new Date().toISOString(), userId)

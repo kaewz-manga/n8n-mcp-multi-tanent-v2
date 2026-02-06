@@ -26,6 +26,7 @@ import Privacy from './pages/Privacy';
 import FAQ from './pages/FAQ';
 import Documentation from './pages/Documentation';
 import Status from './pages/Status';
+import AccountDeleted from './pages/AccountDeleted';
 import { ConnectionProvider } from './contexts/ConnectionContext';
 import { SudoProvider } from './contexts/SudoContext';
 import { Loader2 } from 'lucide-react';
@@ -110,6 +111,7 @@ function AppRoutes() {
         }
       />
       <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route path="/account-deleted" element={<AccountDeleted />} />
 
       {/* Info pages - with Layout if logged in, standalone if not */}
       <Route path="/terms" element={<SmartRoute><Terms /></SmartRoute>} />

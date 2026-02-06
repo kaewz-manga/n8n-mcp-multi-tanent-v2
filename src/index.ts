@@ -1485,7 +1485,7 @@ async function handleManagementApi(
     return apiResponse({
       success: true,
       data: {
-        message: 'Account scheduled for deletion. You have 30 days to recover your account.',
+        message: 'Account scheduled for deletion. You have 14 days to recover your account.',
         scheduled_deletion_at: deletionDate,
       },
     });
@@ -1516,6 +1516,57 @@ async function handleManagementApi(
     return apiResponse({
       success: true,
       data: { message: 'Account recovered successfully. Deletion has been cancelled.' },
+    });
+  }
+
+  // POST /api/user/force-delete (immediately permanently delete account)
+  if (path === '/api/user/force-delete' && method === 'POST') {
+    const body = await request.json().catch(() => ({})) as { password?: string; confirm?: boolean };
+
+    const user = await getUserById(env.DB, authUser.userId);
+    if (!user) {
+      return apiResponse(
+        { success: false, error: { code: 'NOT_FOUND', message: 'User not found' } },
+        404
+      );
+    }
+
+    if (user.status !== 'pending_deletion') {
+      return apiResponse(
+        { success: false, error: { code: 'NOT_PENDING', message: 'Account must be scheduled for deletion first' } },
+        400
+      );
+    }
+
+    // Verify identity
+    if (user.password_hash && !user.oauth_provider) {
+      if (!body.password) {
+        return apiResponse(
+          { success: false, error: { code: 'PASSWORD_REQUIRED', message: 'Password required to force delete' } },
+          400
+        );
+      }
+      const validPassword = await verifyPassword(body.password, user.password_hash);
+      if (!validPassword) {
+        return apiResponse(
+          { success: false, error: { code: 'INVALID_PASSWORD', message: 'Password is incorrect' } },
+          401
+        );
+      }
+    } else {
+      if (!body.confirm) {
+        return apiResponse(
+          { success: false, error: { code: 'CONFIRM_REQUIRED', message: 'Confirmation required to force delete' } },
+          400
+        );
+      }
+    }
+
+    await hardDeleteUser(env.DB, authUser.userId);
+
+    return apiResponse({
+      success: true,
+      data: { message: 'Account permanently deleted' },
     });
   }
 

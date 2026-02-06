@@ -221,6 +221,16 @@ export async function deleteAccount(
   });
 }
 
+export async function forceDeleteAccount(
+  password?: string,
+  confirm?: boolean
+): Promise<ApiResponse<{ message: string }>> {
+  return request('/api/user/force-delete', {
+    method: 'POST',
+    body: JSON.stringify({ password, confirm }),
+  });
+}
+
 export async function updateSessionDuration(
   duration: number
 ): Promise<ApiResponse<{ message: string; token: string; duration: number }>> {

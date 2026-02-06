@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSudoContext } from '../contexts/SudoContext';
 import {
   changePassword,
   deleteAccount,
+  forceDeleteAccount,
   updateSessionDuration,
   setupTOTP,
   enableTOTP,
@@ -11,6 +13,7 @@ import {
   getTOTPStatus,
   exportUserData,
   recoverAccount,
+  clearToken,
   type TOTPSetupData,
 } from '../lib/api';
 import { User, Mail, Shield, Trash2, Loader2, Check, AlertCircle, X, Clock, Smartphone, QrCode, Copy, CheckCircle, Download, FileJson, FileSpreadsheet, RotateCcw } from 'lucide-react';
@@ -66,6 +69,15 @@ export default function Settings() {
   // Account recovery state
   const [recoverLoading, setRecoverLoading] = useState(false);
   const [recoverError, setRecoverError] = useState('');
+
+  // Force delete state
+  const [showForceDelete, setShowForceDelete] = useState(false);
+  const [forceDeletePassword, setForceDeletePassword] = useState('');
+  const [forceDeleteConfirmText, setForceDeleteConfirmText] = useState('');
+  const [forceDeleteLoading, setForceDeleteLoading] = useState(false);
+  const [forceDeleteError, setForceDeleteError] = useState('');
+
+  const navigate = useNavigate();
 
   const isOAuthUser = !!user?.oauth_provider;
   const isPendingDeletion = user?.status === 'pending_deletion';
@@ -219,7 +231,8 @@ export default function Settings() {
       setDeleteLoading(false);
 
       if (res.success) {
-        logout();
+        setShowDeleteConfirm(false);
+        await refreshUser();
       } else {
         setDeleteError(res.error?.message || 'Failed to delete account');
       }
@@ -232,11 +245,46 @@ export default function Settings() {
       setDeleteLoading(false);
 
       if (res.success) {
-        logout();
+        setShowDeleteConfirm(false);
+        await refreshUser();
       } else {
         setDeleteError(res.error?.message || 'Failed to delete account');
       }
     });
+  };
+
+  const handleForceDelete = async () => {
+    setForceDeleteError('');
+    setForceDeleteLoading(true);
+
+    if (isOAuthUser) {
+      if (forceDeleteConfirmText.toLowerCase() !== 'delete') {
+        setForceDeleteError('Please type "delete" to confirm');
+        setForceDeleteLoading(false);
+        return;
+      }
+
+      const res = await forceDeleteAccount(undefined, true);
+      setForceDeleteLoading(false);
+
+      if (res.success) {
+        clearToken();
+        navigate('/account-deleted');
+      } else {
+        setForceDeleteError(res.error?.message || 'Failed to delete account');
+      }
+      return;
+    }
+
+    const res = await forceDeleteAccount(forceDeletePassword, undefined);
+    setForceDeleteLoading(false);
+
+    if (res.success) {
+      clearToken();
+      navigate('/account-deleted');
+    } else {
+      setForceDeleteError(res.error?.message || 'Failed to delete account');
+    }
   };
 
   const handleExport = async (format: 'json' | 'csv') => {
@@ -305,23 +353,100 @@ export default function Settings() {
               {recoverError && (
                 <div className="text-red-400 text-sm mt-2">{recoverError}</div>
               )}
-              <button
-                onClick={handleRecoverAccount}
-                disabled={recoverLoading}
-                className="mt-3 inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-              >
-                {recoverLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Recovering...
-                  </>
-                ) : (
-                  <>
-                    <RotateCcw className="h-4 w-4" />
-                    Cancel Deletion & Recover Account
-                  </>
-                )}
-              </button>
+              <div className="flex gap-3 mt-3">
+                <button
+                  onClick={handleRecoverAccount}
+                  disabled={recoverLoading}
+                  className="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                >
+                  {recoverLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Recovering...
+                    </>
+                  ) : (
+                    <>
+                      <RotateCcw className="h-4 w-4" />
+                      Cancel Deletion & Recover Account
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowForceDelete(true)}
+                  className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Force Delete Now
+                </button>
+              </div>
+
+              {/* Force Delete Confirmation */}
+              {showForceDelete && (
+                <div className="mt-4 bg-red-900/30 border border-red-700 rounded-lg p-4">
+                  <p className="text-sm text-red-300 mb-3">
+                    This will <strong>permanently delete</strong> your account immediately. All data, connections, and API keys will be removed and cannot be recovered.
+                  </p>
+
+                  {forceDeleteError && (
+                    <div className="bg-red-900/30 border border-red-700 text-red-300 px-3 py-2 rounded-lg text-sm mb-3 flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4" />
+                      {forceDeleteError}
+                    </div>
+                  )}
+
+                  {isOAuthUser ? (
+                    <div className="mb-3">
+                      <label className="label text-red-300">Type "delete" to confirm</label>
+                      <input
+                        type="text"
+                        className="input"
+                        placeholder="delete"
+                        value={forceDeleteConfirmText}
+                        onChange={(e) => setForceDeleteConfirmText(e.target.value)}
+                      />
+                    </div>
+                  ) : (
+                    <div className="mb-3">
+                      <label className="label text-red-300">Enter your password to confirm</label>
+                      <input
+                        type="password"
+                        className="input"
+                        placeholder="Your password"
+                        value={forceDeletePassword}
+                        onChange={(e) => setForceDeletePassword(e.target.value)}
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        setShowForceDelete(false);
+                        setForceDeletePassword('');
+                        setForceDeleteConfirmText('');
+                        setForceDeleteError('');
+                      }}
+                      className="btn-secondary"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleForceDelete}
+                      disabled={forceDeleteLoading || (isOAuthUser ? forceDeleteConfirmText.toLowerCase() !== 'delete' : !forceDeletePassword)}
+                      className="btn-danger"
+                    >
+                      {forceDeleteLoading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Deleting...
+                        </>
+                      ) : (
+                        'Permanently Delete Account'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

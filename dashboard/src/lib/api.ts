@@ -319,6 +319,17 @@ export async function getUsage(): Promise<ApiResponse<Usage>> {
   return request('/api/usage');
 }
 
+export interface PlatformStats {
+  total_users: number;
+  total_executions: number;
+  total_successes: number;
+  pass_rate: number;
+}
+
+export async function getPlatformStats(): Promise<ApiResponse<PlatformStats>> {
+  return request('/api/platform-stats');
+}
+
 // ============================================
 // Plans API
 // ============================================

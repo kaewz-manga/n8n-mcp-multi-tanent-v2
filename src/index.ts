@@ -86,6 +86,9 @@ import {
   // Connection Activity Tracking
   updateConnectionLastUsed,
   getInactiveFreePlanConnections,
+  // Platform Stats
+  incrementPlatformStat,
+  getPlatformStats,
 } from './db';
 import { hashPassword, verifyPassword, decrypt, encrypt, generateJWT } from './crypto-utils';
 import { generateApiKey, hashApiKey } from './crypto-utils';
@@ -314,9 +317,10 @@ async function handleManagementApi(
     const body = await request.json() as { email: string; password: string };
     const result = await handleRegister(env.DB, body.email, body.password);
 
-    // Send welcome email on successful registration (non-blocking)
+    // Send welcome email + increment platform stats on successful registration (non-blocking)
     if (result.success && body.email) {
       ctx.waitUntil(sendEmail(env, welcomeEmail(body.email)));
+      ctx.waitUntil(incrementPlatformStat(env.DB, 'total_users'));
     }
 
     return apiResponse(result, result.success ? 201 : 400);
@@ -422,9 +426,10 @@ async function handleManagementApi(
     const result = await handleOAuthCallback(provider, env, code, redirectUri);
 
     if (result.success && result.data) {
-      // Send welcome email for new OAuth users (non-blocking)
+      // Send welcome email + increment stats for new OAuth users (non-blocking)
       if (result.data.isNewUser) {
         ctx.waitUntil(sendEmail(env, welcomeEmail(result.data.user.email)));
+        ctx.waitUntil(incrementPlatformStat(env.DB, 'total_users'));
       }
 
       // Redirect to frontend with token
@@ -464,6 +469,12 @@ async function handleManagementApi(
         features: JSON.parse(p.features || '{}'),
       }))},
     });
+  }
+
+  // Platform stats endpoint (public)
+  if (path === '/api/platform-stats' && method === 'GET') {
+    const stats = await getPlatformStats(env.DB);
+    return apiResponse({ success: true, data: stats });
   }
 
   // ============================================
@@ -1094,6 +1105,8 @@ async function handleManagementApi(
           incrementDailyUsage(env.RATE_LIMIT_KV, userId, today),
           incrementMonthlyUsage(env.DB, userId, yearMonth, true),
           logUsage(env.DB, userId, 'dashboard', connectionId!, toolName, 'success', elapsed, null),
+          incrementPlatformStat(env.DB, 'total_executions'),
+          incrementPlatformStat(env.DB, 'total_successes'),
         ]);
         return apiResponse({ success: true, data: result });
       } catch (err: any) {
@@ -1103,6 +1116,7 @@ async function handleManagementApi(
           incrementDailyUsage(env.RATE_LIMIT_KV, userId, today),
           incrementMonthlyUsage(env.DB, userId, yearMonth, false),
           logUsage(env.DB, userId, 'dashboard', connectionId!, toolName, 'error', elapsed, err.message),
+          incrementPlatformStat(env.DB, 'total_executions'),
         ]);
         return apiResponse({ success: false, error: { code: 'N8N_ERROR', message: err.message } }, 502);
       }
@@ -1762,6 +1776,9 @@ async function handleMcpRequest(
           ),
           // Track connection activity for auto-delete feature
           updateConnectionLastUsed(env.DB, authContext.connection.id),
+          // Platform stats (permanent counters)
+          incrementPlatformStat(env.DB, 'total_executions'),
+          ...(isError ? [] : [incrementPlatformStat(env.DB, 'total_successes')]),
         ]);
 
         // Update remaining count (only if not unlimited)

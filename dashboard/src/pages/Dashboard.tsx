@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { Usage, Connection } from '../lib/api';
-import { getUsage, getConnections } from '../lib/api';
+import type { Usage, Connection, PlatformStats } from '../lib/api';
+import { getUsage, getConnections, getPlatformStats } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Zap,
@@ -11,21 +11,26 @@ import {
   ArrowRight,
   Loader2,
   AlertCircle,
+  Users,
+  CheckCircle,
+  Globe,
 } from 'lucide-react';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const [usage, setUsage] = useState<Usage | null>(null);
   const [connections, setConnections] = useState<Connection[]>([]);
+  const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [usageRes, connectionsRes] = await Promise.all([
+        const [usageRes, connectionsRes, statsRes] = await Promise.all([
           getUsage(),
           getConnections(),
+          getPlatformStats(),
         ]);
 
         if (usageRes.success && usageRes.data) {
@@ -34,6 +39,10 @@ export default function Dashboard() {
 
         if (connectionsRes.success && connectionsRes.data) {
           setConnections(connectionsRes.data.connections);
+        }
+
+        if (statsRes.success && statsRes.data) {
+          setPlatformStats(statsRes.data);
         }
       } catch {
         setError('Failed to load dashboard data');
@@ -178,6 +187,56 @@ export default function Dashboard() {
           </p>
         </div>
       </div>
+
+      {/* Platform Statistics */}
+      {platformStats && (
+        <div className="card">
+          <div className="flex items-center gap-2 mb-4">
+            <Globe className="h-5 w-5 text-n2f-accent" />
+            <h2 className="text-lg font-semibold text-n2f-text">
+              Platform Statistics
+            </h2>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-n2f-elevated rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Users className="h-4 w-4 text-blue-400" />
+                <span className="text-sm text-n2f-text-secondary">Total Users</span>
+              </div>
+              <p className="text-2xl font-bold text-n2f-text">
+                {platformStats.total_users.toLocaleString()}
+              </p>
+            </div>
+            <div className="bg-n2f-elevated rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Activity className="h-4 w-4 text-n2f-accent" />
+                <span className="text-sm text-n2f-text-secondary">Total Executions</span>
+              </div>
+              <p className="text-2xl font-bold text-n2f-text">
+                {platformStats.total_executions.toLocaleString()}
+              </p>
+            </div>
+            <div className="bg-n2f-elevated rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <CheckCircle className="h-4 w-4 text-emerald-400" />
+                <span className="text-sm text-n2f-text-secondary">Successful</span>
+              </div>
+              <p className="text-2xl font-bold text-n2f-text">
+                {platformStats.total_successes.toLocaleString()}
+              </p>
+            </div>
+            <div className="bg-n2f-elevated rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <TrendingUp className="h-4 w-4 text-purple-400" />
+                <span className="text-sm text-n2f-text-secondary">Pass Rate</span>
+              </div>
+              <p className="text-2xl font-bold text-n2f-text">
+                {platformStats.pass_rate}%
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Connections List */}
       <div className="card">

@@ -1126,3 +1126,44 @@ export async function incrementMinuteUsage(
   await kv.put(key, String(newValue), { expirationTtl: 120 });
   return newValue;
 }
+
+// ============================================================
+// Platform Stats (permanent counters)
+// ============================================================
+
+export async function incrementPlatformStat(
+  db: D1Database,
+  key: string,
+  amount: number = 1
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO platform_stats (key, value, updated_at) VALUES (?, ?, datetime('now'))
+       ON CONFLICT(key) DO UPDATE SET value = value + ?, updated_at = datetime('now')`
+    )
+    .bind(key, amount, amount)
+    .run();
+}
+
+export async function getPlatformStats(
+  db: D1Database
+): Promise<{ total_users: number; total_executions: number; total_successes: number; pass_rate: number }> {
+  const result = await db
+    .prepare('SELECT key, value FROM platform_stats')
+    .all<{ key: string; value: number }>();
+
+  const stats: Record<string, number> = {};
+  for (const row of result.results || []) {
+    stats[row.key] = row.value;
+  }
+
+  const totalExec = stats['total_executions'] || 0;
+  const totalSuccess = stats['total_successes'] || 0;
+
+  return {
+    total_users: stats['total_users'] || 0,
+    total_executions: totalExec,
+    total_successes: totalSuccess,
+    pass_rate: totalExec > 0 ? Math.round((totalSuccess / totalExec) * 10000) / 100 : 0,
+  };
+}

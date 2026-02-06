@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { login, getOAuthProviders, getOAuthUrl } from '../lib/api';
 import type { OAuthProvider } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
-import { Loader2, Zap } from 'lucide-react';
+import { Loader2, Zap, ArrowLeft } from 'lucide-react';
 
 // GitHub Icon
 function GitHubIcon({ className }: { className?: string }) {
@@ -92,6 +92,10 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-n2f-bg py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
+          <Link to="/" className="inline-flex items-center gap-1 text-sm text-n2f-text-secondary hover:text-n2f-accent mb-6">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Home
+          </Link>
           <div className="flex justify-center">
             <div className="bg-n2f-accent p-3 rounded-xl">
               <Zap className="h-8 w-8 text-gray-900" />

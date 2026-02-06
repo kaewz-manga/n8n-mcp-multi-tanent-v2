@@ -618,3 +618,59 @@ export async function disableTOTP(password?: string): Promise<ApiResponse<{ mess
     body: JSON.stringify({ password }),
   });
 }
+
+// ============================================
+// Admin System Controls
+// ============================================
+
+export interface MaintenanceState {
+  enabled: boolean;
+  enabled_by: string | null;
+  enabled_at: string | null;
+  message: string | null;
+}
+
+export async function adminRecalculateStats(
+  confirmation: string
+): Promise<ApiResponse<{
+  message: string;
+  usage_monthly: { rows_created: number };
+  platform_stats: { total_users: number; total_executions: number; total_successes: number };
+}>> {
+  return request('/api/admin/system/recalculate-stats', {
+    method: 'POST',
+    body: JSON.stringify({ confirmation }),
+  });
+}
+
+export async function adminClearLogs(
+  confirmation: string
+): Promise<ApiResponse<{ message: string; usage_logs_deleted: number; usage_monthly_deleted: number }>> {
+  return request('/api/admin/system/clear-logs', {
+    method: 'POST',
+    body: JSON.stringify({ confirmation }),
+  });
+}
+
+export async function adminFullReset(
+  confirmation: string
+): Promise<ApiResponse<{ message: string; users_deleted: number; connections_deleted: number; [key: string]: any }>> {
+  return request('/api/admin/system/full-reset', {
+    method: 'POST',
+    body: JSON.stringify({ confirmation }),
+  });
+}
+
+export async function getMaintenanceMode(): Promise<ApiResponse<MaintenanceState>> {
+  return request('/api/admin/system/maintenance');
+}
+
+export async function setMaintenanceMode(
+  enabled: boolean,
+  message?: string
+): Promise<ApiResponse<MaintenanceState & { status_message: string }>> {
+  return request('/api/admin/system/maintenance', {
+    method: 'POST',
+    body: JSON.stringify({ enabled, message }),
+  });
+}

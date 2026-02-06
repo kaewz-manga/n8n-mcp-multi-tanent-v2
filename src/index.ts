@@ -94,6 +94,13 @@ import {
   getFeedbackByUserId,
   getAllFeedback,
   updateFeedbackStatus,
+  // Admin System Controls
+  recalculateUsageMonthly,
+  recalculatePlatformStats,
+  clearAllLogs,
+  fullSystemReset,
+  getMaintenanceMode,
+  setMaintenanceMode,
 } from './db';
 import { hashPassword, verifyPassword, decrypt, encrypt, generateJWT } from './crypto-utils';
 import { generateApiKey, hashApiKey } from './crypto-utils';
@@ -896,6 +903,103 @@ async function handleManagementApi(
       }
       await updateFeedbackStatus(env.DB, feedbackUpdateMatch[1], body.status || 'reviewed', body.admin_notes);
       return apiResponse({ success: true, data: { message: 'Feedback updated' } });
+    }
+
+    // ============================================
+    // Admin System Control Endpoints
+    // ============================================
+
+    // POST /api/admin/system/recalculate-stats
+    if (path === '/api/admin/system/recalculate-stats' && method === 'POST') {
+      const body = await request.json() as { confirmation?: string };
+      if (body.confirmation !== 'CONFIRM') {
+        return apiResponse({ success: false, error: { code: 'CONFIRMATION_REQUIRED', message: 'Type CONFIRM to proceed' } }, 400);
+      }
+
+      const [monthlyResult, statsResult] = await Promise.all([
+        recalculateUsageMonthly(env.DB),
+        recalculatePlatformStats(env.DB),
+      ]);
+
+      await logAdminAction(env.DB, admin.userId, 'recalculate_stats', null, { monthly: monthlyResult, stats: statsResult });
+
+      return apiResponse({
+        success: true,
+        data: {
+          message: 'Stats recalculated successfully',
+          usage_monthly: monthlyResult,
+          platform_stats: statsResult,
+        },
+      });
+    }
+
+    // POST /api/admin/system/clear-logs (requires sudo)
+    if (path === '/api/admin/system/clear-logs' && method === 'POST') {
+      const sudoStatus = await hasSudoSession(env.RATE_LIMIT_KV, admin.userId);
+      if (!sudoStatus.active) {
+        return apiResponse({ success: false, error: { code: 'SUDO_REQUIRED', message: 'Security verification required' } }, 403);
+      }
+
+      const body = await request.json() as { confirmation?: string };
+      if (body.confirmation !== 'CONFIRM') {
+        return apiResponse({ success: false, error: { code: 'CONFIRMATION_REQUIRED', message: 'Type CONFIRM to proceed' } }, 400);
+      }
+
+      const result = await clearAllLogs(env.DB);
+      await logAdminAction(env.DB, admin.userId, 'clear_logs', null, result);
+
+      return apiResponse({
+        success: true,
+        data: { message: 'All logs cleared', ...result },
+      });
+    }
+
+    // POST /api/admin/system/full-reset (requires sudo)
+    if (path === '/api/admin/system/full-reset' && method === 'POST') {
+      const sudoStatus = await hasSudoSession(env.RATE_LIMIT_KV, admin.userId);
+      if (!sudoStatus.active) {
+        return apiResponse({ success: false, error: { code: 'SUDO_REQUIRED', message: 'Security verification required' } }, 403);
+      }
+
+      const body = await request.json() as { confirmation?: string };
+      if (body.confirmation !== 'FULL RESET') {
+        return apiResponse({ success: false, error: { code: 'CONFIRMATION_REQUIRED', message: 'Type FULL RESET to proceed' } }, 400);
+      }
+
+      const result = await fullSystemReset(env.DB);
+      await logAdminAction(env.DB, admin.userId, 'full_system_reset', null, result);
+
+      return apiResponse({
+        success: true,
+        data: { message: 'Full system reset completed', ...result },
+      });
+    }
+
+    // GET /api/admin/system/maintenance
+    if (path === '/api/admin/system/maintenance' && method === 'GET') {
+      const state = await getMaintenanceMode(env.RATE_LIMIT_KV);
+      return apiResponse({ success: true, data: state });
+    }
+
+    // POST /api/admin/system/maintenance (requires sudo)
+    if (path === '/api/admin/system/maintenance' && method === 'POST') {
+      const sudoStatus = await hasSudoSession(env.RATE_LIMIT_KV, admin.userId);
+      if (!sudoStatus.active) {
+        return apiResponse({ success: false, error: { code: 'SUDO_REQUIRED', message: 'Security verification required' } }, 403);
+      }
+
+      const body = await request.json() as { enabled: boolean; message?: string };
+      if (typeof body.enabled !== 'boolean') {
+        return apiResponse({ success: false, error: { code: 'VALIDATION_ERROR', message: 'enabled must be a boolean' } }, 400);
+      }
+
+      const state = await setMaintenanceMode(env.RATE_LIMIT_KV, body.enabled, admin.userId, body.message);
+      await logAdminAction(env.DB, admin.userId, body.enabled ? 'enable_maintenance' : 'disable_maintenance', null, { message: body.message });
+
+      return apiResponse({
+        success: true,
+        data: { ...state, status_message: body.enabled ? 'Maintenance mode enabled' : 'Maintenance mode disabled' },
+      });
     }
 
     return apiResponse({ success: false, error: { code: 'NOT_FOUND', message: 'Admin endpoint not found' } }, 404);
@@ -1944,6 +2048,27 @@ export default {
           api: '/api/*',
         },
       });
+    }
+
+    // Maintenance mode guard (block non-admin, non-login routes)
+    if (path !== '/') {
+      const isAdminRoute = path.startsWith('/api/admin/');
+      const isLoginRoute = path === '/api/auth/login' || path === '/api/auth/verify-sudo';
+      if (!isAdminRoute && !isLoginRoute) {
+        const maintenance = await getMaintenanceMode(env.RATE_LIMIT_KV);
+        if (maintenance.enabled) {
+          return apiResponse(
+            {
+              success: false,
+              error: {
+                code: 'MAINTENANCE_MODE',
+                message: maintenance.message || 'System is under maintenance. Please try again later.',
+              },
+            },
+            503
+          );
+        }
+      }
     }
 
     // Management API

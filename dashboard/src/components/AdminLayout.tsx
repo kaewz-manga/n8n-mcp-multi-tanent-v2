@@ -9,6 +9,7 @@ import {
   DollarSign,
   HeartPulse,
   MessageSquare,
+  Wrench,
   ArrowLeft,
   LogOut,
   Menu,
@@ -22,6 +23,7 @@ const adminNav = [
   { name: 'Revenue', href: '/admin/revenue', icon: DollarSign },
   { name: 'System Health', href: '/admin/health', icon: HeartPulse },
   { name: 'Feedback', href: '/admin/feedback', icon: MessageSquare },
+  { name: 'System', href: '/admin/system', icon: Wrench },
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {

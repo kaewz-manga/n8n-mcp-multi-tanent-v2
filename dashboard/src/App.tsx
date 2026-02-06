@@ -17,6 +17,7 @@ import AdminAnalytics from './pages/admin/AdminAnalytics';
 import AdminRevenue from './pages/admin/AdminRevenue';
 import AdminHealth from './pages/admin/AdminHealth';
 import AdminFeedback from './pages/admin/AdminFeedback';
+import AdminSystem from './pages/admin/AdminSystem';
 import WorkflowList from './pages/n8n/WorkflowList';
 import ExecutionList from './pages/n8n/ExecutionList';
 import CredentialList from './pages/n8n/CredentialList';
@@ -162,6 +163,7 @@ function AppRoutes() {
       <Route path="/admin/revenue" element={<AdminRoute><AdminRevenue /></AdminRoute>} />
       <Route path="/admin/health" element={<AdminRoute><AdminHealth /></AdminRoute>} />
       <Route path="/admin/feedback" element={<AdminRoute><AdminFeedback /></AdminRoute>} />
+      <Route path="/admin/system" element={<AdminRoute><AdminSystem /></AdminRoute>} />
 
       {/* n8n Management routes - 6 pages, all operations per resource */}
       <Route path="/n8n/workflows" element={<ProtectedRoute><WorkflowList /></ProtectedRoute>} />

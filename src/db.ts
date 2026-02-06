@@ -1265,3 +1265,183 @@ export async function updateFeedbackStatus(
       .run();
   }
 }
+
+// ============================================
+// Admin System Controls
+// ============================================
+
+export async function recalculateUsageMonthly(
+  db: D1Database
+): Promise<{ rows_created: number }> {
+  await db.prepare('DELETE FROM usage_monthly').run();
+
+  const result = await db.prepare(
+    `INSERT INTO usage_monthly (id, user_id, year_month, request_count, success_count, error_count, created_at, updated_at)
+     SELECT
+       lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6))),
+       user_id,
+       strftime('%Y-%m', created_at),
+       COUNT(*),
+       SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END),
+       SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END),
+       datetime('now'),
+       datetime('now')
+     FROM usage_logs
+     GROUP BY user_id, strftime('%Y-%m', created_at)`
+  ).run();
+
+  return { rows_created: result.meta.changes || 0 };
+}
+
+export async function recalculatePlatformStats(
+  db: D1Database
+): Promise<{ total_users: number; total_executions: number; total_successes: number }> {
+  const [usersResult, execResult, successResult] = await Promise.all([
+    db.prepare("SELECT COUNT(*) as count FROM users WHERE status != 'deleted'").first<{ count: number }>(),
+    db.prepare('SELECT COUNT(*) as count FROM usage_logs').first<{ count: number }>(),
+    db.prepare("SELECT COUNT(*) as count FROM usage_logs WHERE status = 'success'").first<{ count: number }>(),
+  ]);
+
+  const total_users = usersResult?.count || 0;
+  const total_executions = execResult?.count || 0;
+  const total_successes = successResult?.count || 0;
+
+  await db.prepare(
+    `INSERT INTO platform_stats (key, value, updated_at) VALUES ('total_users', ?, datetime('now'))
+     ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime('now')`
+  ).bind(total_users, total_users).run();
+
+  await db.prepare(
+    `INSERT INTO platform_stats (key, value, updated_at) VALUES ('total_executions', ?, datetime('now'))
+     ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime('now')`
+  ).bind(total_executions, total_executions).run();
+
+  await db.prepare(
+    `INSERT INTO platform_stats (key, value, updated_at) VALUES ('total_successes', ?, datetime('now'))
+     ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime('now')`
+  ).bind(total_successes, total_successes).run();
+
+  return { total_users, total_executions, total_successes };
+}
+
+export async function clearAllLogs(
+  db: D1Database
+): Promise<{ usage_logs_deleted: number; usage_monthly_deleted: number }> {
+  const logsResult = await db.prepare('DELETE FROM usage_logs').run();
+  const monthlyResult = await db.prepare('DELETE FROM usage_monthly').run();
+
+  await db.prepare(
+    "UPDATE platform_stats SET value = 0, updated_at = datetime('now') WHERE key IN ('total_executions', 'total_successes')"
+  ).run();
+
+  return {
+    usage_logs_deleted: logsResult.meta.changes || 0,
+    usage_monthly_deleted: monthlyResult.meta.changes || 0,
+  };
+}
+
+export async function fullSystemReset(
+  db: D1Database
+): Promise<{
+  users_deleted: number;
+  connections_deleted: number;
+  api_keys_deleted: number;
+  ai_connections_deleted: number;
+  bot_connections_deleted: number;
+  usage_logs_deleted: number;
+  usage_monthly_deleted: number;
+  admin_logs_deleted: number;
+  feedback_deleted: number;
+}> {
+  // Get non-admin user IDs
+  const nonAdminUsers = await db.prepare(
+    'SELECT id FROM users WHERE is_admin != 1'
+  ).all<{ id: string }>();
+
+  const userIds = (nonAdminUsers.results || []).map(u => u.id);
+  let connections_deleted = 0;
+  let api_keys_deleted = 0;
+  let ai_connections_deleted = 0;
+  let bot_connections_deleted = 0;
+
+  // Delete each non-admin user's data (same pattern as hardDeleteUser)
+  for (const userId of userIds) {
+    const r1 = await db.prepare('DELETE FROM api_keys WHERE user_id = ?').bind(userId).run();
+    api_keys_deleted += r1.meta.changes || 0;
+    const r2 = await db.prepare('DELETE FROM bot_connections WHERE user_id = ?').bind(userId).run();
+    bot_connections_deleted += r2.meta.changes || 0;
+    const r3 = await db.prepare('DELETE FROM ai_connections WHERE user_id = ?').bind(userId).run();
+    ai_connections_deleted += r3.meta.changes || 0;
+    const r4 = await db.prepare('DELETE FROM n8n_connections WHERE user_id = ?').bind(userId).run();
+    connections_deleted += r4.meta.changes || 0;
+    await db.prepare('DELETE FROM users WHERE id = ?').bind(userId).run();
+  }
+
+  // Delete all logs
+  const logsResult = await db.prepare('DELETE FROM usage_logs').run();
+  const monthlyResult = await db.prepare('DELETE FROM usage_monthly').run();
+  const adminLogsResult = await db.prepare('DELETE FROM admin_logs').run();
+  const feedbackResult = await db.prepare('DELETE FROM feedback').run();
+
+  // Recalculate platform stats from remaining admin users
+  const adminCount = await db.prepare(
+    "SELECT COUNT(*) as count FROM users WHERE status != 'deleted'"
+  ).first<{ count: number }>();
+
+  await db.prepare(
+    "UPDATE platform_stats SET value = 0, updated_at = datetime('now') WHERE key IN ('total_executions', 'total_successes')"
+  ).run();
+  await db.prepare(
+    `INSERT INTO platform_stats (key, value, updated_at) VALUES ('total_users', ?, datetime('now'))
+     ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime('now')`
+  ).bind(adminCount?.count || 0, adminCount?.count || 0).run();
+
+  return {
+    users_deleted: userIds.length,
+    connections_deleted,
+    api_keys_deleted,
+    ai_connections_deleted,
+    bot_connections_deleted,
+    usage_logs_deleted: logsResult.meta.changes || 0,
+    usage_monthly_deleted: monthlyResult.meta.changes || 0,
+    admin_logs_deleted: adminLogsResult.meta.changes || 0,
+    feedback_deleted: feedbackResult.meta.changes || 0,
+  };
+}
+
+// ============================================
+// Maintenance Mode (KV-based)
+// ============================================
+
+export interface MaintenanceState {
+  enabled: boolean;
+  enabled_by: string | null;
+  enabled_at: string | null;
+  message: string | null;
+}
+
+export async function getMaintenanceMode(
+  kv: KVNamespace
+): Promise<MaintenanceState> {
+  const value = await kv.get('system:maintenance_mode');
+  if (!value) {
+    return { enabled: false, enabled_by: null, enabled_at: null, message: null };
+  }
+  return JSON.parse(value);
+}
+
+export async function setMaintenanceMode(
+  kv: KVNamespace,
+  enabled: boolean,
+  adminId: string,
+  message?: string
+): Promise<MaintenanceState> {
+  const state: MaintenanceState = {
+    enabled,
+    enabled_by: enabled ? adminId : null,
+    enabled_at: enabled ? new Date().toISOString() : null,
+    message: enabled ? (message || null) : null,
+  };
+  await kv.put('system:maintenance_mode', JSON.stringify(state));
+  return state;
+}

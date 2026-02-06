@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getPlans, type Plan } from '../lib/api';
+import { getPlans, getPlatformStats, type Plan, type PlatformStats } from '../lib/api';
 import {
   Zap,
   Shield,
@@ -12,15 +12,25 @@ import {
   ArrowRight,
   Github,
   ExternalLink,
+  Users,
+  Activity,
+  CheckCircle,
+  TrendingUp,
 } from 'lucide-react';
 
 export default function Landing() {
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [stats, setStats] = useState<PlatformStats | null>(null);
 
   useEffect(() => {
     getPlans().then((res) => {
       if (res.success && res.data) {
         setPlans(res.data.plans);
+      }
+    });
+    getPlatformStats().then((res) => {
+      if (res.success && res.data) {
+        setStats(res.data);
       }
     });
   }, []);
@@ -100,6 +110,44 @@ Would you like me to activate the Data Sync Pipeline?`}</code>
           </div>
         </div>
       </section>
+
+      {/* Platform Stats */}
+      {stats && (
+        <section className="py-12 border-b border-n2f-border">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+              <div>
+                <div className="flex items-center justify-center mb-2">
+                  <Users className="h-5 w-5 text-blue-400" />
+                </div>
+                <p className="text-3xl font-bold text-n2f-text">{stats.total_users.toLocaleString()}</p>
+                <p className="text-sm text-n2f-text-secondary">Total Users</p>
+              </div>
+              <div>
+                <div className="flex items-center justify-center mb-2">
+                  <Activity className="h-5 w-5 text-n2f-accent" />
+                </div>
+                <p className="text-3xl font-bold text-n2f-text">{stats.total_executions.toLocaleString()}</p>
+                <p className="text-sm text-n2f-text-secondary">Tool Executions</p>
+              </div>
+              <div>
+                <div className="flex items-center justify-center mb-2">
+                  <CheckCircle className="h-5 w-5 text-emerald-400" />
+                </div>
+                <p className="text-3xl font-bold text-n2f-text">{stats.total_successes.toLocaleString()}</p>
+                <p className="text-sm text-n2f-text-secondary">Successful</p>
+              </div>
+              <div>
+                <div className="flex items-center justify-center mb-2">
+                  <TrendingUp className="h-5 w-5 text-purple-400" />
+                </div>
+                <p className="text-3xl font-bold text-n2f-text">{stats.pass_rate}%</p>
+                <p className="text-sm text-n2f-text-secondary">Pass Rate</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Features Section */}
       <section className="py-20">

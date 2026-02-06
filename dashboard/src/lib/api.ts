@@ -509,6 +509,63 @@ export async function getAdminErrorTrend(days?: number): Promise<ApiResponse<{ t
 }
 
 // ============================================
+// Feedback API
+// ============================================
+
+export interface FeedbackItem {
+  id: string;
+  user_id: string;
+  category: 'bug' | 'feature' | 'general' | 'question';
+  message: string;
+  status: 'new' | 'reviewed' | 'resolved' | 'archived';
+  admin_notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminFeedbackItem extends FeedbackItem {
+  user_email: string;
+}
+
+export async function submitFeedback(
+  category: string,
+  message: string
+): Promise<ApiResponse<{ feedback: FeedbackItem }>> {
+  return request('/api/feedback', {
+    method: 'POST',
+    body: JSON.stringify({ category, message }),
+  });
+}
+
+export async function getUserFeedback(): Promise<ApiResponse<{ feedback: FeedbackItem[] }>> {
+  return request('/api/feedback');
+}
+
+export async function getAdminFeedback(params: {
+  limit?: number;
+  offset?: number;
+  status?: string;
+  category?: string;
+}): Promise<ApiResponse<{ feedback: AdminFeedbackItem[]; total: number }>> {
+  const qs = new URLSearchParams();
+  if (params.limit) qs.set('limit', String(params.limit));
+  if (params.offset) qs.set('offset', String(params.offset));
+  if (params.status) qs.set('status', params.status);
+  if (params.category) qs.set('category', params.category);
+  return request(`/api/admin/feedback?${qs.toString()}`);
+}
+
+export async function updateAdminFeedback(
+  id: string,
+  data: { status?: string; admin_notes?: string }
+): Promise<ApiResponse<{ message: string }>> {
+  return request(`/api/admin/feedback/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+// ============================================
 // Sudo Mode (TOTP-based Security Verification)
 // ============================================
 

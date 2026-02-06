@@ -89,6 +89,11 @@ import {
   // Platform Stats
   incrementPlatformStat,
   getPlatformStats,
+  // Feedback
+  createFeedback,
+  getFeedbackByUserId,
+  getAllFeedback,
+  updateFeedbackStatus,
 } from './db';
 import { hashPassword, verifyPassword, decrypt, encrypt, generateJWT } from './crypto-utils';
 import { generateApiKey, hashApiKey } from './crypto-utils';
@@ -864,6 +869,33 @@ async function handleManagementApi(
       const days = parseInt(new URL(request.url).searchParams.get('days') || '30');
       const trend = await getErrorTrend(env.DB, days);
       return apiResponse({ success: true, data: { trend } });
+    }
+
+    // GET /api/admin/feedback
+    if (path === '/api/admin/feedback' && method === 'GET') {
+      const params = new URL(request.url).searchParams;
+      const result = await getAllFeedback(env.DB, {
+        limit: parseInt(params.get('limit') || '20'),
+        offset: parseInt(params.get('offset') || '0'),
+        status: params.get('status') || undefined,
+        category: params.get('category') || undefined,
+      });
+      return apiResponse({ success: true, data: result });
+    }
+
+    // PUT /api/admin/feedback/:id
+    const feedbackUpdateMatch = path.match(/^\/api\/admin\/feedback\/([^/]+)$/);
+    if (feedbackUpdateMatch && method === 'PUT') {
+      const body = await request.json() as { status?: string; admin_notes?: string };
+      const validStatuses = ['new', 'reviewed', 'resolved', 'archived'];
+      if (body.status && !validStatuses.includes(body.status)) {
+        return apiResponse(
+          { success: false, error: { code: 'INVALID_STATUS', message: 'Status must be new, reviewed, resolved, or archived' } },
+          400
+        );
+      }
+      await updateFeedbackStatus(env.DB, feedbackUpdateMatch[1], body.status || 'reviewed', body.admin_notes);
+      return apiResponse({ success: true, data: { message: 'Feedback updated' } });
     }
 
     return apiResponse({ success: false, error: { code: 'NOT_FOUND', message: 'Admin endpoint not found' } }, 404);
@@ -1676,6 +1708,39 @@ async function handleManagementApi(
 
     await revokeApiKey(env.DB, keyId);
     return apiResponse({ success: true, data: { message: 'API key revoked' } });
+  }
+
+  // ============================================
+  // Feedback Endpoints
+  // ============================================
+
+  // POST /api/feedback - Submit feedback
+  if (path === '/api/feedback' && method === 'POST') {
+    const body = await request.json() as { category?: string; message?: string };
+
+    const validCategories = ['bug', 'feature', 'general', 'question'];
+    if (!body.category || !validCategories.includes(body.category)) {
+      return apiResponse(
+        { success: false, error: { code: 'INVALID_CATEGORY', message: 'Category must be bug, feature, general, or question' } },
+        400
+      );
+    }
+
+    if (!body.message || body.message.length < 10 || body.message.length > 2000) {
+      return apiResponse(
+        { success: false, error: { code: 'INVALID_MESSAGE', message: 'Message must be between 10 and 2000 characters' } },
+        400
+      );
+    }
+
+    const feedback = await createFeedback(env.DB, authUser.userId, body.category, body.message);
+    return apiResponse({ success: true, data: { feedback } }, 201);
+  }
+
+  // GET /api/feedback - User's own feedback
+  if (path === '/api/feedback' && method === 'GET') {
+    const feedback = await getFeedbackByUserId(env.DB, authUser.userId);
+    return apiResponse({ success: true, data: { feedback } });
   }
 
   // GET /api/usage

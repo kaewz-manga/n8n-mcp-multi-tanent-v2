@@ -2,7 +2,7 @@
 
 > Context สำหรับ Claude ตัวใหม่ที่จะทำงานต่อ
 
-**Updated**: 2026-02-05
+**Updated**: 2026-02-08
 **GitHub**: https://github.com/kaewz-manga/n8n-management-mcp
 
 ### Production URLs
@@ -36,9 +36,128 @@ It connects to this Worker via:
 
 ---
 
-## สถานะปัจจุบัน (2026-02-05)
+## สถานะปัจจุบัน (2026-02-08)
 
-### ✅ ล่าสุด (2026-02-05 - Session 4)
+### ✅ ล่าสุด (2026-02-08 - Session 6)
+
+**Feedback Bubble Feature (10 files: 3 new, 7 modified)**:
+
+1. **Feedback Database Table**
+   - Migration: `migrations/009_feedback.sql` — `feedback` table with indexes on user_id, status, created_at
+   - Fields: id, user_id, category (bug/feature/general/question), message, status (new/reviewed/resolved/archived), admin_notes
+   - 4 DB functions: `createFeedback`, `getFeedbackByUserId`, `getAllFeedback`, `updateFeedbackStatus`
+
+2. **Feedback API Endpoints**
+   - `POST /api/feedback` — Submit feedback (JWT required, validates category + message 10-2000 chars)
+   - `GET /api/feedback` — User's own feedback list
+   - `GET /api/admin/feedback?limit=&offset=&status=&category=` — Admin: paginated + filtered, JOINs users for email
+   - `PUT /api/admin/feedback/:id` — Admin: update status + notes
+
+3. **FeedbackBubble Component**
+   - Orange floating bubble (56px) fixed bottom-right, z-40
+   - MessageSquarePlus icon, toggles to X when open
+   - Panel (w-80) with category dropdown + message textarea + submit
+   - Success state: CheckCircle + "Thank you!" auto-closes after 2s
+   - Dark theme: bg-n2f-card, bg-n2f-elevated inputs
+
+4. **Admin Feedback Page**
+   - Pattern: same as AdminUsers.tsx (table + filters + pagination)
+   - Filters: status dropdown + category dropdown
+   - Table: User Email, Category (icon+color badge), Message (truncated), Status (badge), Date
+   - Detail modal: full message, status selector, admin notes textarea, Save button
+   - Category icons: Bug (red), Lightbulb (amber), MessageSquare (blue), HelpCircle (purple)
+
+5. **Integration**
+   - `FeedbackBubble` added to `Layout.tsx` — visible on all logged-in pages
+   - `/admin/feedback` route added to `App.tsx`
+   - "Feedback" nav item with MessageSquare icon added to `AdminLayout.tsx`
+
+**New Files**:
+- `migrations/009_feedback.sql` — feedback table + 3 indexes
+- `dashboard/src/components/FeedbackBubble.tsx` — Floating bubble + panel component
+- `dashboard/src/pages/admin/AdminFeedback.tsx` — Admin feedback management page
+
+**Modified Files**:
+- `src/saas-types.ts` — Added `Feedback` interface
+- `src/db.ts` — Added 4 feedback CRUD functions
+- `src/index.ts` — Added 4 feedback routes (2 user + 2 admin)
+- `dashboard/src/lib/api.ts` — Added types + 4 API functions
+- `dashboard/src/components/Layout.tsx` — Added `<FeedbackBubble />`
+- `dashboard/src/App.tsx` — Added `/admin/feedback` route
+- `dashboard/src/components/AdminLayout.tsx` — Added "Feedback" nav link
+
+**Database**: 11 tables now (added `feedback`)
+
+**Deployed**: Worker `df68b918` + Dashboard `3fe976a3`
+
+---
+
+### ✅ ก่อนหน้า (2026-02-07 - Session 5)
+
+**5 Features + 1 Bug Fix**:
+
+1. **SmartRoute — Public Pages in Dashboard Layout**
+   - Info pages (`/terms`, `/privacy`, `/faq`, `/docs`, `/status`) now show inside Dashboard Layout when logged in
+   - New `SmartRoute` wrapper: logged in → Layout, guest → standalone
+   - Commit: `0d9a265`
+
+2. **Back Button on Login/Register**
+   - Added `ArrowLeft` back-to-home button on Login and Register pages
+   - Better navigation UX
+
+3. **Platform-Wide Statistics**
+   - Migration: `migrations/008_platform_stats.sql` — `platform_stats` table with permanent counters
+   - `incrementPlatformStat()` in db.ts — INSERT ON CONFLICT DO UPDATE for atomic increments
+   - `getPlatformStats()` — Returns total_users, total_executions, total_successes, pass_rate
+   - `GET /api/platform-stats` — Public endpoint (no auth required)
+   - Stats auto-increment on: user registration, MCP tool execution (success/error)
+   - Dashboard page shows stats in 4-column grid
+   - Commit: `3089b15`
+
+4. **Account Deletion Rework**
+   - Grace period changed from **30 → 14 days**
+   - `pending_deletion` users can now **login** (to recover or force delete)
+   - New endpoint: `POST /api/user/force-delete` — immediate permanent deletion
+     - Password users: requires password verification
+     - OAuth users: requires `confirm: true`
+   - After schedule delete → user stays on Settings page, sees recovery banner
+   - Recovery banner has 2 buttons: "Cancel Deletion & Recover" + "Force Delete Now"
+   - Force Delete → confirmation (password or type "delete") → hard delete → redirect `/account-deleted`
+   - New page: `AccountDeleted.tsx` — standalone page, tells user data is gone, links to register
+   - Commit: `c49e4b8`
+
+5. **Bug Fix: Back to Home Redirect**
+   - Problem: AccountDeleted "Back to Home" went to Register instead of Landing
+   - Root cause: `clearToken()` removes localStorage but AuthContext still holds `user` in memory
+   - Fix: Changed `navigate('/account-deleted')` → `window.location.href = '/account-deleted'` (full page reload resets React state)
+   - Commit: `3dde2c8`
+
+6. **Platform Stats on Landing Page**
+   - Landing page now shows platform stats (Total Users, Executions, Successful, Pass Rate)
+   - Section placed between Hero and Features sections
+   - Commit: `dc74cf4`
+
+**New Files**:
+- `migrations/008_platform_stats.sql` — platform_stats table + 3 seed rows
+- `dashboard/src/pages/AccountDeleted.tsx` — Account deleted confirmation page
+
+**Modified Files**:
+- `src/index.ts` — Force delete endpoint, platform stats endpoint, 14-day message, stat increments
+- `src/db.ts` — 14-day grace period, incrementPlatformStat(), getPlatformStats()
+- `src/auth.ts` — Allow pending_deletion login
+- `dashboard/src/lib/api.ts` — forceDeleteAccount(), getPlatformStats()
+- `dashboard/src/App.tsx` — SmartRoute wrapper, AccountDeleted route
+- `dashboard/src/pages/Settings.tsx` — Force delete UI, recovery banner changes
+- `dashboard/src/pages/Dashboard.tsx` — Platform stats display
+- `dashboard/src/pages/Landing.tsx` — Platform stats section, back button
+- `dashboard/src/pages/Login.tsx` — Back button
+- `dashboard/src/pages/Register.tsx` — Back button
+
+**Database**: 10 tables now (added `platform_stats`)
+
+---
+
+### ✅ ก่อนหน้า (2026-02-05 - Session 4)
 
 **Deployment + Config Updates**:
 
@@ -98,16 +217,17 @@ It connects to this Worker via:
    - Excludes: password_hash, encrypted keys/secrets
    - Dashboard: Export buttons in Settings page
 
-2. **Account Recovery (30-day grace period)**
+2. **Account Recovery (14-day grace period)**
    - `DELETE /api/user` now schedules deletion instead of immediate soft delete
    - `POST /api/user/recover` to cancel scheduled deletion
+   - `POST /api/user/force-delete` to permanently delete immediately (NEW 2026-02-07)
    - Migration: `migrations/006_scheduled_deletion.sql` adds `scheduled_deletion_at` column
-   - Dashboard: Recovery banner in Settings page when pending deletion
+   - Dashboard: Recovery banner in Settings page with Recover + Force Delete buttons
 
 3. **Auto-delete Logs (90-day retention)**
    - Cloudflare Cron Trigger: `0 0 * * *` (daily at midnight UTC)
    - Deletes `usage_logs` older than 90 days
-   - Processes expired account deletions (30-day grace period)
+   - Processes expired account deletions (14-day grace period)
    - `wrangler.toml` updated with `[triggers]` section
 
 4. **Email Notifications (Resend)**
@@ -177,7 +297,7 @@ It connects to this Worker via:
 
 - **SaaS Backend** - Auth, Connections, API Keys, Rate Limiting, Usage Tracking
 - **31 MCP Tools** - n8n Public API coverage (Community Edition)
-- **Cloudflare D1** - Database สร้าง + schema apply + migrations แล้ว (9 tables total)
+- **Cloudflare D1** - Database สร้าง + schema apply + migrations แล้ว (11 tables total)
 - **Cloudflare KV** - Rate limiting cache + OAuth state
 - **GitHub Actions** - CI/CD (typecheck + deploy)
 - **E2E Test ผ่าน** - Register → Login → Add Connection → MCP Initialize → list_workflows → list_tags
@@ -206,7 +326,7 @@ It connects to this Worker via:
 ### ✅ Main Dashboard API Testing (2026-02-05)
 - 14/14 endpoints tested and passed
 - Registration, Login, Profile, Connections, Usage, Export, OAuth all working
-- Account deletion (30-day grace) and recovery working
+- Account deletion (14-day grace + force delete) and recovery working
 
 ### ⏳ ยังไม่ได้ทดสอบละเอียด
 
@@ -311,9 +431,9 @@ It connects to this Worker via:
 ```
 n8n-management-mcp/
 ├── src/
-│   ├── index.ts          # Main Worker - API routes + MCP handler (~1500 lines)
+│   ├── index.ts          # Main Worker - API routes + MCP handler (~1600 lines)
 │   ├── auth.ts           # Auth - register, login, API key validation (~530 lines)
-│   ├── db.ts             # D1 database layer - all CRUD (~410 lines)
+│   ├── db.ts             # D1 database layer - all CRUD (~500 lines)
 │   ├── crypto-utils.ts   # PBKDF2, AES-GCM, JWT, API key gen (~345 lines)
 │   ├── oauth.ts          # GitHub + Google OAuth flow (~330 lines)
 │   ├── stripe.ts         # Stripe checkout, portal, webhooks (~295 lines)
@@ -335,8 +455,11 @@ n8n-management-mcp/
 │   │   │   ├── Settings.tsx  # Profile, password, MCP config, danger zone
 │   │   │   ├── FAQ.tsx       # FAQ with search + accordion (NEW 2026-02-05)
 │   │   │   ├── Documentation.tsx # Docs + MCP tools (NEW 2026-02-05)
-│   │   │   └── Status.tsx    # Real-time health monitor (NEW 2026-02-05)
-│   │   ├── components/Layout.tsx  # Sidebar navigation
+│   │   │   ├── Status.tsx    # Real-time health monitor (NEW 2026-02-05)
+│   │   │   └── AccountDeleted.tsx # Account deleted confirmation (NEW 2026-02-07)
+│   │   │   └── admin/AdminFeedback.tsx # Admin feedback management (NEW 2026-02-08)
+│   │   ├── components/Layout.tsx  # Sidebar navigation + FeedbackBubble
+│   │   ├── components/FeedbackBubble.tsx # Floating feedback bubble (NEW 2026-02-08)
 │   │   ├── contexts/AuthContext.tsx # Auth state management
 │   │   └── lib/api.ts       # API client (auth, connections, usage, billing, OAuth)
 │   ├── wrangler.toml         # Cloudflare Pages config
@@ -372,6 +495,7 @@ n8n-management-mcp/
 | `/api/auth/oauth/:provider` | GET | Get OAuth authorize URL |
 | `/api/auth/oauth/:provider/callback` | GET | OAuth callback → redirect with JWT |
 | `/api/plans` | GET | List pricing plans |
+| `/api/platform-stats` | GET | Platform statistics (total users, executions, pass rate) |
 
 ### Webhook (signature verified)
 
@@ -385,7 +509,8 @@ n8n-management-mcp/
 |----------|--------|-------------|
 | `/api/user/profile` | GET | User profile |
 | `/api/user/password` | PUT | Change password |
-| `/api/user` | DELETE | Delete account (soft delete) |
+| `/api/user` | DELETE | Schedule account deletion (14-day grace) |
+| `/api/user/force-delete` | POST | Force delete account immediately |
 | `/api/connections` | GET | List n8n connections + API keys |
 | `/api/connections` | POST | Add n8n connection → returns `n2f_xxx` key |
 | `/api/connections/:id` | DELETE | Delete connection |
@@ -400,6 +525,8 @@ n8n-management-mcp/
 | `/api/bot-connections/:id/webhook` | POST | Register webhook → returns URL |
 | `/api/bot-connections/:id/webhook` | DELETE | Deregister webhook |
 | `/api/usage` | GET | Usage statistics (requests, limits, success rate) |
+| `/api/feedback` | POST | Submit feedback (category + message) |
+| `/api/feedback` | GET | User's own feedback list |
 | `/api/billing/checkout` | POST | Create Stripe checkout session |
 | `/api/billing/portal` | POST | Create Stripe billing portal |
 
@@ -428,6 +555,8 @@ n8n-management-mcp/
 | `/api/admin/analytics/errors` | GET | Recent errors |
 | `/api/admin/users/:id/status` | PUT | Update user status |
 | `/api/admin/users/:id/plan` | PUT | Update user plan |
+| `/api/admin/feedback` | GET | List all feedback (paginated + filters) |
+| `/api/admin/feedback/:id` | PUT | Update feedback status + admin notes |
 
 ---
 
@@ -446,7 +575,7 @@ n8n-management-mcp/
 
 ## Database Schema (D1)
 
-9 tables total (6 core + 3 from migrations):
+11 tables total (6 core + 5 from migrations):
 
 | Table | Key Fields |
 |-------|------------|
@@ -459,6 +588,8 @@ n8n-management-mcp/
 | **admin_logs** | id, admin_user_id, action, target_user_id, details |
 | **ai_connections** | id, user_id, name, provider_url, api_key_encrypted, model_name, is_default, status |
 | **bot_connections** | id, user_id, platform, name, bot_token_encrypted, channel_secret_encrypted, ai_connection_id, mcp_api_key_encrypted, webhook_active, webhook_url, status |
+| **platform_stats** | key (PRIMARY), value (INTEGER), updated_at |
+| **feedback** | id, user_id, category (bug/feature/general/question), message, status (new/reviewed/resolved/archived), admin_notes |
 
 ---
 
@@ -468,6 +599,7 @@ n8n-management-mcp/
 Email/Password:
   Register → PBKDF2 hash → user created (plan: free)
   Login → verify hash → JWT token (24 hours)
+  Note: pending_deletion users CAN login (to recover or force delete)
 
 OAuth (GitHub/Google):
   Dashboard → Worker /api/auth/oauth/:provider → redirect to provider
@@ -569,6 +701,7 @@ Claude Desktop config:
 8. **package-lock.json out of sync** - vitest@2.1.9 missing from lock file → Cloudflare Pages `npm ci` failed → Fixed: ran `npm install` to sync (275b97d)
 9. **TypeScript errors after npm fix** - Missing `is_admin` in JWTPayload, missing `oauth_provider` in User, `listCredentials` call removed → Fixed types and code (6f465a2)
 10. **OAuth delete account not working** - `oauth_provider` was NULL in database for all OAuth users → UI showed password field instead of "delete" confirmation → Fixed: modified `createUser()` in db.ts and OAuth handlers in oauth.ts to store provider info (2026-02-05)
+11. **AccountDeleted "Back to Home" goes to Register** - `clearToken()` removes localStorage but AuthContext still holds `user` in React state → `PublicRoute` redirects to Dashboard → `ProtectedRoute` redirects to Login → Fixed: use `window.location.href` for full page reload instead of `navigate()` (3dde2c8)
 
 ---
 
@@ -583,6 +716,16 @@ Claude Desktop config:
 ## Git History (Key Commits)
 
 ```
+# 2026-02-08 (Session 6 - Feedback Bubble Feature)
+# Deployed but not yet committed — Worker df68b918, Dashboard 3fe976a3
+
+# 2026-02-07 (Session 5 - Platform Stats + Account Deletion Rework)
+dc74cf4 feat: show platform statistics on landing page
+3dde2c8 fix: use full page reload after force delete to reset auth state
+c49e4b8 feat: rework account deletion with force delete and 14-day grace period
+3089b15 feat: add back button on auth pages + platform-wide statistics
+0d9a265 feat: show public pages inside dashboard layout for logged-in users
+
 # 2026-02-05 (Session 4 - Deployment)
 d77af66 chore: update .mcp.json for Windows + add .gitignore entries
 
@@ -624,6 +767,8 @@ d3dcb23 fix: simplify delete account flow for OAuth users
 ### ✅ Migrations Applied
 - `migrations/006_scheduled_deletion.sql` - scheduled_deletion_at column
 - `migrations/007_connection_last_used.sql` - last_used_at column
+- `migrations/008_platform_stats.sql` - platform_stats table (total_users, total_executions, total_successes)
+- `migrations/009_feedback.sql` - feedback table (user feedback with category, status, admin_notes)
 
 ### ✅ Email Secrets Set
 - `RESEND_API_KEY` - Resend API key
@@ -637,7 +782,7 @@ d3dcb23 fix: simplify delete account flow for OAuth users
 - ~~Connections CRUD~~ ✅ (validates n8n URL)
 - ~~Usage tracking~~ ✅
 - ~~Data Export (JSON/CSV)~~ ✅
-- ~~Account deletion (30-day grace)~~ ✅
+- ~~Account deletion (14-day grace + force delete)~~ ✅
 - ~~Account recovery~~ ✅
 - ~~OAuth providers (GitHub/Google)~~ ✅
 
@@ -648,7 +793,7 @@ d3dcb23 fix: simplify delete account flow for OAuth users
 
 ### Priority 3: Billing & Production
 - Set Stripe secrets → `wrangler secret put` (ดู DEPLOYMENT.md Step 10)
-- Landing page → ปรับ Landing.tsx ให้แสดงข้อมูลจริง
+- ~~Landing page → ปรับ Landing.tsx ให้แสดงข้อมูลจริง~~ ✅ (platform stats added)
 - Rate limit tuning, error alerting, backup strategy
 
 ---
@@ -667,15 +812,18 @@ d3dcb23 fix: simplify delete account flow for OAuth users
 | 8 | `docs/DEPLOYMENT.md` | Full deployment guide (11 steps) |
 | 9 | `dashboard/src/lib/api.ts` | Frontend API client |
 
-### New Public Pages (2026-02-05)
+### New Public Pages
 
-| File | Description |
-|------|-------------|
-| `dashboard/src/pages/FAQ.tsx` | FAQ with search + accordion (~500 lines) |
-| `dashboard/src/pages/Documentation.tsx` | Docs + 31 MCP tools reference (~720 lines) |
-| `dashboard/src/pages/Status.tsx` | Real-time health monitoring (~450 lines) |
-| `dashboard/src/pages/Privacy.tsx` | Privacy Policy - GDPR/PDPA (~350 lines) |
-| `dashboard/src/pages/Terms.tsx` | Terms of Service (~350 lines) |
+| File | Description | Added |
+|------|-------------|-------|
+| `dashboard/src/pages/FAQ.tsx` | FAQ with search + accordion (~500 lines) | 2026-02-05 |
+| `dashboard/src/pages/Documentation.tsx` | Docs + 31 MCP tools reference (~720 lines) | 2026-02-05 |
+| `dashboard/src/pages/Status.tsx` | Real-time health monitoring (~450 lines) | 2026-02-05 |
+| `dashboard/src/pages/Privacy.tsx` | Privacy Policy - GDPR/PDPA (~350 lines) | 2026-02-05 |
+| `dashboard/src/pages/Terms.tsx` | Terms of Service (~350 lines) | 2026-02-05 |
+| `dashboard/src/pages/AccountDeleted.tsx` | Account deleted confirmation + register link | 2026-02-07 |
+| `dashboard/src/components/FeedbackBubble.tsx` | Floating feedback bubble + panel | 2026-02-08 |
+| `dashboard/src/pages/admin/AdminFeedback.tsx` | Admin feedback management (table + modal) | 2026-02-08 |
 
 ---
 

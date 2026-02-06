@@ -24,6 +24,7 @@ import {
   HelpCircle,
   Activity,
 } from 'lucide-react';
+import FeedbackBubble from './FeedbackBubble';
 
 interface LayoutProps {
   children: ReactNode;
@@ -239,6 +240,9 @@ export default function Layout({ children }: LayoutProps) {
         {/* Page content */}
         <main className="p-4 lg:p-8">{children}</main>
       </div>
+
+      {/* Feedback bubble */}
+      <FeedbackBubble />
     </div>
   );
 }

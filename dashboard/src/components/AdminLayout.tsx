@@ -8,6 +8,7 @@ import {
   BarChart3,
   DollarSign,
   HeartPulse,
+  MessageSquare,
   ArrowLeft,
   LogOut,
   Menu,
@@ -20,6 +21,7 @@ const adminNav = [
   { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
   { name: 'Revenue', href: '/admin/revenue', icon: DollarSign },
   { name: 'System Health', href: '/admin/health', icon: HeartPulse },
+  { name: 'Feedback', href: '/admin/feedback', icon: MessageSquare },
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {

@@ -12,6 +12,7 @@ import {
   UsageLog,
   UsageMonthly,
   Plan,
+  Feedback,
   Env,
 } from './saas-types';
 import { generateUUID } from './crypto-utils';
@@ -1166,4 +1167,101 @@ export async function getPlatformStats(
     total_successes: totalSuccess,
     pass_rate: totalExec > 0 ? Math.round((totalSuccess / totalExec) * 10000) / 100 : 0,
   };
+}
+
+// ============================================
+// Feedback Operations
+// ============================================
+
+export async function createFeedback(
+  db: D1Database,
+  userId: string,
+  category: string,
+  message: string
+): Promise<Feedback> {
+  const id = generateUUID();
+  const now = new Date().toISOString();
+
+  await db
+    .prepare(
+      `INSERT INTO feedback (id, user_id, category, message, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'new', ?, ?)`
+    )
+    .bind(id, userId, category, message, now, now)
+    .run();
+
+  return {
+    id,
+    user_id: userId,
+    category: category as Feedback['category'],
+    message,
+    status: 'new',
+    admin_notes: null,
+    created_at: now,
+    updated_at: now,
+  };
+}
+
+export async function getFeedbackByUserId(
+  db: D1Database,
+  userId: string
+): Promise<Feedback[]> {
+  const result = await db
+    .prepare('SELECT * FROM feedback WHERE user_id = ? ORDER BY created_at DESC')
+    .bind(userId)
+    .all<Feedback>();
+
+  return result.results || [];
+}
+
+export async function getAllFeedback(
+  db: D1Database,
+  options: { limit: number; offset: number; status?: string; category?: string }
+): Promise<{ feedback: any[]; total: number }> {
+  const conditions: string[] = [];
+  const binds: any[] = [];
+
+  if (options.status) {
+    conditions.push('f.status = ?');
+    binds.push(options.status);
+  }
+  if (options.category) {
+    conditions.push('f.category = ?');
+    binds.push(options.category);
+  }
+
+  const where = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
+
+  const countResult = await db
+    .prepare(`SELECT COUNT(*) as total FROM feedback f${where}`)
+    .bind(...binds)
+    .first<{ total: number }>();
+
+  const dataResult = await db
+    .prepare(
+      `SELECT f.*, u.email as user_email FROM feedback f JOIN users u ON f.user_id = u.id${where} ORDER BY f.created_at DESC LIMIT ? OFFSET ?`
+    )
+    .bind(...binds, options.limit, options.offset)
+    .all();
+
+  return { feedback: dataResult.results || [], total: countResult?.total || 0 };
+}
+
+export async function updateFeedbackStatus(
+  db: D1Database,
+  id: string,
+  status: string,
+  adminNotes?: string
+): Promise<void> {
+  if (adminNotes !== undefined) {
+    await db
+      .prepare('UPDATE feedback SET status = ?, admin_notes = ?, updated_at = ? WHERE id = ?')
+      .bind(status, adminNotes, new Date().toISOString(), id)
+      .run();
+  } else {
+    await db
+      .prepare('UPDATE feedback SET status = ?, updated_at = ? WHERE id = ?')
+      .bind(status, new Date().toISOString(), id)
+      .run();
+  }
 }

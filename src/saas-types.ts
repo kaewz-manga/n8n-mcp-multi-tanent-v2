@@ -111,6 +111,17 @@ export interface BotConnection {
   updated_at: string;
 }
 
+export interface Feedback {
+  id: string;
+  user_id: string;
+  category: 'bug' | 'feature' | 'general' | 'question';
+  message: string;
+  status: 'new' | 'reviewed' | 'resolved' | 'archived';
+  admin_notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // ============================================
 // API Request/Response Types
 // ============================================

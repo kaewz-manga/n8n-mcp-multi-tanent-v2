@@ -18,7 +18,7 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
-const SAAS_URL = 'https://n8n-mcp-saas.suphakitm99.workers.dev';
+const SAAS_URL = process.env.MCP_URL || 'https://mcp.node2flow.net';
 
 /**
  * Get config from command line args or environment variables.
@@ -261,22 +261,17 @@ class SaasClient {
   constructor(apiKey) {
     this.apiKey = apiKey;
     this.requestId = 0;
+    this.cachedTools = null;
   }
 
-  /**
-   * Send a JSON-RPC 2.0 tools/call request to the SaaS MCP endpoint
-   */
-  async callTool(toolName, args) {
+  async rpcCall(method, params = {}) {
     this.requestId++;
 
     const body = {
       jsonrpc: '2.0',
       id: this.requestId,
-      method: 'tools/call',
-      params: {
-        name: toolName,
-        arguments: args || {},
-      },
+      method,
+      params,
     };
 
     const response = await fetch(`${SAAS_URL}/mcp`, {
@@ -300,6 +295,26 @@ class SaasClient {
     }
 
     return result.result;
+  }
+
+  /**
+   * Fetch tools list from the server (cached after first call)
+   */
+  async listTools() {
+    if (this.cachedTools) return this.cachedTools;
+    const result = await this.rpcCall('tools/list');
+    this.cachedTools = result.tools || [];
+    return this.cachedTools;
+  }
+
+  /**
+   * Send a JSON-RPC 2.0 tools/call request to the SaaS MCP endpoint
+   */
+  async callTool(toolName, args) {
+    return this.rpcCall('tools/call', {
+      name: toolName,
+      arguments: args || {},
+    });
   }
 }
 
@@ -861,9 +876,19 @@ async function main() {
   );
 
   // Register tool list handler
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: TOOLS,
-  }));
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    if (isSaas) {
+      // Fetch actual tools from the server
+      try {
+        const tools = await saasClient.listTools();
+        return { tools };
+      } catch {
+        // Fallback to local tools list if server is unreachable
+        return { tools: TOOLS };
+      }
+    }
+    return { tools: TOOLS };
+  });
 
   // Register tool call handler
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -911,8 +936,15 @@ async function main() {
   await server.connect(transport);
 
   if (isSaas) {
-    console.error('n8n MCP Server running on stdio (SaaS mode)');
-    console.error(`Connected to: ${SAAS_URL}`);
+    // Initialize connection with the server
+    try {
+      await saasClient.rpcCall('initialize');
+      console.error('n8n MCP Server running on stdio (SaaS mode)');
+      console.error(`Connected to: ${SAAS_URL}`);
+    } catch (err) {
+      console.error(`Warning: Could not initialize with ${SAAS_URL}: ${err.message}`);
+      console.error('Will attempt to connect on first tool call.');
+    }
   } else {
     console.error('n8n MCP Server running on stdio (Direct mode)');
     console.error(`Connected to: ${config.apiUrl}`);
